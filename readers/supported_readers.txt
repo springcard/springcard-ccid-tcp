@@ -1,0 +1,12 @@
+#
+# List of readers supported by the SpringCard Network CCID driver
+# Generated: 2016-03-03
+#
+
+
+##########################
+# section: supported
+##########################
+
+# E663
+0x0000:0x0000:SPRINGCARD E663 663E-CCID

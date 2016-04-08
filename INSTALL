@@ -1,0 +1,92 @@
+INSTALLATION PROCEDURE
+======================
+
+Installation from source:
+"""""""""""""""""""""""""
+
+get the ccid-x.y.z.tar.gz archive and do:
+
+$ tar xzvf springcardtcpccid-x.y.z.tar.gz
+$ cd springcardtcpccid-x.y.z
+$ ./configure
+$ make
+$ sudo make install
+
+By default pcscd and my ccid driver use /usr/local/pcsc/drivers/ as
+directory for hotplug drivers. The ./configure script try to get the
+directory used by pcscd using 'pkg-config libpcsclite --variable=usbdropdir'
+So you should not have to use the --enable-usbdropdir=DIR argument.
+
+Note
+~~~~
+This package is derivated from the CCID package from Ludovic Rousseau.
+We disable USB and TwinSerie and add Network management for SpringCard PC/SC Reader.
+We have made minor changes inside the def.h and ifdhandler.c file.(See _NETWORK).
+
+libusb not found
+~~~~~~~~~~~~~~~~
+
+If the ./configure script says something like:
+  configure: error: usb.h not found, use --enable-libusb=PATH
+You should use --enable-libusb=PATH to tell ./configure where to find
+the usb.h and libusb.so files. The ./configure script will use
+PATH/include/ to search for usb.h and PATH/lib/ to search for libusb.so
+
+
+configuring the driver for the network reader
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+You have to create or edit the file /etc/reader.conf. The file should
+contain something like:
+
+#FRIENDLYNAME      "SpringCard Reader Name"
+#DEVICENAME        www.xxx.yyy.zzz:port:option:key
+#LIBPATH           TARGET
+#CHANNELID         1
+
+FRIENDLYNAME      "E663"
+DEVICENAME        192.168.17.100:3999:00:nokey
+LIBPATH           /usr/local/lib/pcsc/drivers/ethernet/libspringcardtcpccid.so.1.2.3
+
+You will have to adapt the library path to your configuration and library
+version.
+
+Binary installation:
+""""""""""""""""""""
+
+Contact your distribution support.
+
+
+Test procedure:
+"""""""""""""""
+
+- check the reader is supported by the driver.
+  Get your reader USB identification using the lsusb(1) command:
+  $ lsusb
+  [...]
+  Bus 001 Device 048: ID 08e6:4433 Gemplus
+
+  Look for 08E6 (ifdVendorID) and 4433 (ifdProductID) in
+  /usr/local/pcsc/drivers/ifd-ccid.bundle/Contents/Info.plist
+  Of course your numbers will be different.
+
+  If you can't find them add them (if you know what you do) and/or mail me.
+
+- (re)start pcscd with debug on stdout. Simply do 'pcscd --debug stdout'
+  (you will need to have root priviledges). And look for:
+  [...]
+  readerfactory.c:1319 RFInitializeReader: Attempting startup of ReaderName
+  readerfactory.c:1061 RFBindFunctions: Loading IFD Handler 2.0
+  ifdhandler.c:76 Entering IFDHCreateChannel (lun: 0)
+  ccid_usb.c:131 Manufacturer: Ludovic Rousseau (ludovic.rousseau@free.fr)
+  ccid_usb.c:139 ProductString: Generic CCID reader v0.1.0
+  ccid_usb.c:143 Copyright: This driver is protected by terms of the GNU General Public License version 2, or (at your option) any later version.
+  ccid_usb.c:223 Found Vendor/Product: 08E6/4433 (GemPC433 SL)
+  ccid_usb.c:224 Using USB bus/device: 001/047
+
+  If you don't see this the driver is not installed correctly or your
+  reader is not yet supported. Read
+  http://pcsclite.alioth.debian.org/ccid.html#CCID_compliant to know
+  what to do.
+
+$Id: INSTALL 4814 2010-03-12 15:42:07Z rousseau $

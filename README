@@ -1,0 +1,109 @@
+USB CCID IFD Handler
+====================
+
+This package provides the source code for a SpringCard Network CCID (Chip/Smart
+Card Interface Devices) and ICCD (Integrated Circuit(s) Card Devices)
+driver. See the USB CCID [1] and ICCD [2] specifications from the USB
+working group.
+
+[1] http://www.usb.org/developers/devclass_docs/DWG_Smart-Card_CCID_Rev110.pdf
+[2] http://www.usb.org/developers/devclass_docs/DWG_Smart-Card_USB-ICC_ICCD_rev10.pdf
+
+Authors of CCID (based library):
+================================
+
+- Ludovic Rousseau <ludovic.rousseau@free.fr>
+- Carlos Prados for the PPS and ATR parsing code (taken from his
+  towitoto driver) in towitoko/ directory.
+- Olaf Kirch for the T=1 TPDU code (from the OpenCT package) in openct/
+  directory. I (Ludovic Rousseau) greatly improved this code.
+  
+Authors of SPRINGCARDTCPCCID :
+================================
+- Matthieu Barreteau <support@springcard.com>
+- Sylvain ALBERT <support@springcard.com>
+
+CCID and ICCD readers:
+======================
+
+A reader can be in one of these list:
+- supported
+    SpringCard Ethernet Reader
+
+
+Supported operating systems:
+============================
+
+- GNU/Linux (libusb 1.0)
+- MacOS X/Darwin (libusb 1.0)
+
+See also http://pcsclite.alioth.debian.org/ccid.html for more
+information.
+
+
+Debug informations:
+===================
+
+The driver uses the debug function provided by pcscd. So if pcscd sends
+its debug to stdout (pcscd --foreground) then the CCID driver will also
+send its debug to stdout. If pcscd sends its debug to syslog (by
+default) then the CCID driver will also send its debug to syslog.
+
+You can change the debug level using the Info.plist configuration file.
+The Info.plist is installed, by default, in
+/usr/local/pcsc/drivers/ifd-ccid.bundle/Contents/Info.plist
+or set the environment variable LIBCCID_ifdLogLevel.
+
+The debug level is set in the ifdLogLevel field. It is a binary OR
+combinaison of 4 different levels.
+- 1: critical: important error messages
+- 2: info:     informative messages like what reader was detected
+- 4: comm:     a dump of all the bytes exchanged between the host and the
+               reader
+- 8: periodic: periodic info when pcscd test if a card is present (every
+               1/10 of a second)
+
+By default the debug level is set to 3 (1 + 2) and correspond to the
+critical and info levels.
+
+You have to restart the driver so it read the configuration file again
+and use the new debug level value.  To restart the driver you just need
+to unplug all your CCID readers so the the driver is unloaded and then
+replug your readers. You can also restart pcscd.
+
+
+Driver installation
+=================
+
+You have to restart the driver so it read the configuration file again
+and use the new debug level value.  To restart the driver you just need
+to unplug all your CCID readers so the the driver is unloaded and then
+replug your readers.  You can also restart pcscd.
+
+
+Licence:
+========
+
+  This library is free software; you can redistribute it and/or modify it
+under the terms of the GNU Lesser General Public License as published by
+the Free Software Foundation; either version 2.1 of the License, or (at
+your option) any later version.
+
+  This library is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+General Public License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+along with this library; if not, write to the Free Software Foundation,
+Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+
+History:
+========
+
+1.4.18 - 09 March 2046, Sylvain ALBERT
+    - First public release
+      . The library is a copy of the CCID library from Lucovic Rousseau.
+      . Remove USB and TwinSerie management.
+      . Add Network management for SpringCard Readers.      
