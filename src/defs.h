@@ -123,3 +123,4 @@ typedef enum {
 
 //#endif
 
+#define ControlUSB(a, b, c, d, e, f) -1 ; assert(1 == 0);

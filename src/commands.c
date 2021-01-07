@@ -40,6 +40,7 @@
 #include <pcsclite.h>
 #include <ifdhandler.h>
 #include <reader.h>
+#include <assert.h>
 
 #include "misc.h"
 #include "commands.h"
