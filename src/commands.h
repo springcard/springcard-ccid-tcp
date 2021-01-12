@@ -46,6 +46,9 @@ RESPONSECODE CmdPowerOff(unsigned int reader_index);
 RESPONSECODE CmdGetSlotStatus(unsigned int reader_index,
 	/*@out@*/ unsigned char buffer[]);
 
+RESPONSECODE CmdNetworkGetSlotStatus(unsigned int reader_index,
+	/*@out@*/ unsigned char buffer[]);
+
 RESPONSECODE CmdXfrBlock(unsigned int reader_index, unsigned int tx_length,
 	unsigned char tx_buffer[], unsigned int *rx_length,
 	unsigned char rx_buffer[], int protoccol);

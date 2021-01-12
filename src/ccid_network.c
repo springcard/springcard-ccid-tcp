@@ -26,6 +26,7 @@
 
 #define __CCID_NETWORK__
 
+#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -356,7 +357,7 @@ static RESPONSECODE tryConnection(unsigned int reader_index)
 	{
 
 		// flush socket ?! 
-		read(networkDevice[reader_index].dev_handle,working_buffer, 256);
+		int r = read(networkDevice[reader_index].dev_handle,working_buffer, 256);
 		
 		DEBUG_INFO1("Start Configuration");
 		// request set configuration and start reader 
@@ -403,7 +404,7 @@ status_t OpenNetwork(unsigned int reader_index, /*@unused@*/ int Channel)
 	
 	DEBUG_INFO2("Reader index: %X", reader_index);
 	
-	return OpenNETWORKByName(reader_index, NULL);
+	return OpenNetworkByName(reader_index, NULL);
 } /* OpenUSB */
 
 

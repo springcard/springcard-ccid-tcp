@@ -28,17 +28,17 @@
 #define __CCID_NETWORK_H__
 
 
-status_t OpenNETWORK(unsigned int reader_index, int channel);
+status_t OpenNetwork(unsigned int reader_index, int channel);
 
-status_t OpenNETWORKByName(unsigned int reader_index, /*@null@*/ char *device);
+status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device);
 
-status_t WriteNETWORK(unsigned int reader_index, unsigned int length,
+status_t WriteNetwork(unsigned int reader_index, unsigned int length,
 	unsigned char *Buffer);
 
-status_t ReadNETWORK(unsigned int reader_index, unsigned int *length,
+status_t ReadNetwork(unsigned int reader_index, unsigned int *length,
 	/*@out@*/ unsigned char *Buffer);
 
-status_t CloseNETWORK(unsigned int reader_index);
+status_t CloseNetwork(unsigned int reader_index);
 
 int InterruptRead(int reader_index, int timeout);
 void InterruptStop(int reader_index);
