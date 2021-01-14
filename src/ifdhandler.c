@@ -137,11 +137,13 @@ static RESPONSECODE CreateChannelByNameOrChannel(DWORD Lun,
 		goto error;
 	}
 	else
-	{
+	{	
 		unsigned char pcbuffer[SIZE_GET_SLOT_STATUS];
 		unsigned int oldReadTimeout;
 		RESPONSECODE cmd_ret;
 		_ccid_descriptor *ccid_descriptor = get_ccid_descriptor(reader_index);
+
+		//CcidSlots[reader_index].readerName = strdup(ccid_descriptor->sIFD_serial_number);
 
 		/* Maybe we have a special treatment for this reader */
 		(void)ccid_open_hack_pre(reader_index);
@@ -585,7 +587,6 @@ EXTERNAL RESPONSECODE IFDHGetCapabilities(DWORD Lun, DWORD Tag,
 		case SCARD_ATTR_VENDOR_IFD_SERIAL_NO:
 			{
 				_ccid_descriptor *ccid_desc;
-
 				ccid_desc = get_ccid_descriptor(reader_index);
 				if (ccid_desc->sIFD_serial_number)
 				{

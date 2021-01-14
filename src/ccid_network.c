@@ -55,7 +55,7 @@
 
 /* driver informations */
 #define LIB_NAME										"SpringcardNetworkCCID"
-#define LIB_VERSION										"1.4.18"
+#define LIB_VERSION										"1.4.20"
 
 #define NOT_CONNECTED	0
 #define CONNECTED		1
@@ -111,16 +111,17 @@
 #define PC_To_RDR_SetDataRateAndClockFrequency	0x73
 
 
-#define GET_STATUS								0x00
-#define SET_CONFIG								0x09
-#define GET_DESCRIPTOR							0x06
+#define GET_STATUS														0x00
+#define SET_CONFIG														0x09
+#define GET_DESCRIPTOR												0x06
 
-#define RDR_To_PC_DataBlock						0x80
-#define RDR_To_PC_SlotStatus					0x81
-#define RDR_To_PC_Parameters					0x82
-#define RDR_To_PC_Escape						0x83
+#define RDR_To_PC_DataBlock										0x80
+#define RDR_To_PC_SlotStatus									0x81
+#define RDR_To_PC_Parameters									0x82
+#define RDR_To_PC_Escape											0x83
 #define RDR_To_PC_DataRateAndClockFrequency		0x84
-#define RDR_to_PC_NotifySlotChange				0x50
+#define RDR_to_PC_NotifySlotChange						0x50
+#define RDR_to_PC_AnswerToUnsupportedMessage	0x00
 
 
 const unsigned char GET_DEVICE[]          = {EP_Control_To_RDR, GET_DESCRIPTOR, 0, 0, 0, 0, 1, 0, 0, 0, 0};
@@ -410,7 +411,7 @@ status_t OpenNetwork(unsigned int reader_index, /*@unused@*/ int Channel)
 
 /*****************************************************************************
  *
- *					OpenNETWORKByName
+ *					OpenNetworkByName
  *
  ****************************************************************************/
 status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
@@ -488,7 +489,7 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
     {     
 			DEBUG_INFO1("Unable to get reader informations over network");
 			return STATUS_UNSUCCESSFUL; 
-	  /* claim success, will retry later but keep reader in list */
+	  	/* claim success, will retry later but keep reader in list */
     }
   }
   /* get information about reader */
@@ -500,8 +501,7 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
   {
 		DEBUG_INFO2("flush socket %d", rv);
 	}
-  
-  
+    
   // query for reader informations 
   rv = write(networkDevice[reader_index].dev_handle,GET_DEVICE,sizeof(GET_DEVICE));
   if ( rv != sizeof(GET_DEVICE))
@@ -662,11 +662,9 @@ full_sn:
   //CCID_CLASS_SHORT_APDU
   //configuration_descriptor[42] = 0x02;
   
-  DEBUG_INFO2("dwFeatures : 0x%04x",dw2i(configuration_descriptor, 40));
-  
+  DEBUG_INFO2("dwFeatures : 0x%04x",dw2i(configuration_descriptor, 40));  
   DEBUG_INFO5("dwFeatures : %02X %02X %02X %02X ",configuration_descriptor[40], configuration_descriptor[41], configuration_descriptor[42], configuration_descriptor[43]);
-  
-  
+    
   DEBUG_INFO1("Start Configuration");
   // request set configuration and start reader 
   SET_CONFIGURATION[6] = READER_OPTION_START;
@@ -720,12 +718,20 @@ full_sn:
   networkDevice[reader_index].ccid.bNumEndpoints              = 0; // 3 to force to use own pooling thread 0;
   networkDevice[reader_index].ccid.dwSlotStatus               = IFD_ICC_PRESENT;
   networkDevice[reader_index].ccid.bVoltageSupport            = configuration_descriptor[5];
-  networkDevice[reader_index].ccid.sIFD_serial_number         = NULL;
+  networkDevice[reader_index].ccid.sIFD_serial_number         = networkDevice[reader_index].serial_number; //NULL;
   networkDevice[reader_index].ccid.gemalto_firmware_features  = NULL;
+  networkDevice[reader_index].ccid.sIFD_iManufacturer					= networkDevice[reader_index].vendor_name;
+
+	/* Vendor-supplied interface device version (DWORD in the form
+				 * 0xMMmmbbbb where MM = major version, mm = minor version, and
+				 * bbbb = build number). */
+	networkDevice[reader_index].ccid.IFD_bcdDevice							= device_descriptor[13]<<24 | device_descriptor[12] << 16;
   
-  networkDevice[reader_index].real_nb_opened_slots = (int) (networkDevice[reader_index].ccid.bMaxSlotIndex) + 1 ;
+	networkDevice[reader_index].real_nb_opened_slots = (int) (networkDevice[reader_index].ccid.bMaxSlotIndex) + 1 ;
   networkDevice[reader_index].nb_opened_slots = &networkDevice[reader_index].real_nb_opened_slots;
-  
+
+   DEBUG_INFO2("IFD_bcdDevice " DWORD_X "", networkDevice[reader_index].ccid.IFD_bcdDevice); 
+	 DEBUG_INFO2("sIFD_serial_number " DWORD_X "", networkDevice[reader_index].ccid.sIFD_serial_number); 
    
   networkDevice[reader_index].status =  CONNECTED;
   
@@ -994,9 +1000,9 @@ wait_again:
 	
 	/*DEBUG_INFO5("%X %X %X %X", buffer[0], buffer[1], buffer[2], buffer[3]);
 	DEBUG_INFO5("%X %X %X %X", buffer[4], buffer[5], buffer[6], buffer[7]);
-	DEBUG_INFO5("%X %X %X %X", buffer[8], buffer[9], buffer[10], buffer[11]);*/
+	DEBUG_INFO5("%X %X %X %X", buffer[8], buffer[9], buffer[10], buffer[11]);
 	
-	DEBUG_INFO3( "Status %d Read %d", status,  *length);
+	DEBUG_INFO3( "Status %d Read %d", status,  *length);*/
 
   return status;
 	
@@ -1161,13 +1167,11 @@ static void *Multi_PollingProc(void *p_ext)
 	//rv = 0;
 	while (!msExt->terminated)
 	{
-
+		
+select_again:
 		if ( (networkDevice[msExt->reader_index].status == CONNECTED) && 
 			(networkDevice[msExt->reader_index].dev_handle != -1) )
 		{
-		
-select_again:
-
 			if ( msExt->terminated )
 			{
 				break;
@@ -1191,6 +1195,7 @@ select_again:
 			else
 			{
 				//DEBUG_INFO1("select no data but try read to check connection");
+				goto select_again;
 			}
 			
 read_again:			
@@ -1253,7 +1258,7 @@ read_again:
 			}
 			else if( rv == 0 )
 			{
-				DEBUG_INFO1( "STATUS_NO_DATA_TO_READ");
+				//DEBUG_INFO1( "STATUS_NO_DATA_TO_READ");
 				goto select_again;
 			}
 	
@@ -1376,7 +1381,8 @@ filter_interrupt:
 				msExt->card_status[(int)receive_buffer[6]] = receive_buffer[8];
 				msExt->card_error[(int)receive_buffer[6]] = receive_buffer[9];
 				
-				DEBUG_INFO2("CardStatus %02X", msExt->card_status[(int)receive_buffer[6]]);
+				//DEBUG_INFO2("CardStatus %02X", msExt->card_status[(int)receive_buffer[6]]);
+				//DEBUG_INFO4("CardStatus %02X %02X %02X", receive_buffer[6], receive_buffer[8], receive_buffer[9]);
 				//show_debug = 0;
 			}
 			else if ( receive_buffer[1] == RDR_To_PC_Parameters)
@@ -1395,6 +1401,10 @@ filter_interrupt:
 			{
 				snprintf( debug_header, 256, "RDR_to_PC_NotifySlotChange");	
 			}
+			else if ( receive_buffer[1] == RDR_to_PC_AnswerToUnsupportedMessage)
+			{
+				snprintf( debug_header, 256, "RDR_to_PC_AnswerToUnsupportedMessage");
+			}
 			else 
 			{
 				snprintf( debug_header, 256, "Unknow command code %X", receive_buffer[1]);
@@ -1408,7 +1418,7 @@ filter_interrupt:
 			msExt->buffer_size = trame_size;
 			msExt->status = STATUS_SUCCESS;
 			
-			/*DEBUG_INFO2("trame_size %d", trame_size);PC_To_RDR_IccPowerOff
+			/*DEBUG_INFO2("trame_size %d", trame_size);
 			DEBUG_INFO5("%X %X %X %X", receive_buffer[1], receive_buffer[2], receive_buffer[3], receive_buffer[4]);
 			DEBUG_INFO5("%X %X %X %X", receive_buffer[5], receive_buffer[6], receive_buffer[7], receive_buffer[8]);
 			DEBUG_INFO5("%X %X %X %X", receive_buffer[9], receive_buffer[10], receive_buffer[11], receive_buffer[12]);*/
@@ -1476,9 +1486,10 @@ RESPONSECODE CmdNetworkGetSlotStatus(unsigned int reader_index, unsigned char bu
 	{
 		return IFD_COMMUNICATION_ERROR;
 	}
-	buffer[7] = networkDevice[reader_index].multislot_extension->card_status[(int)buffer[5]];
+	buffer[7] = networkDevice[reader_index].multislot_extension->card_status[reader_index];
 	
-	DEBUG_INFO2("Card Status %X", buffer[7]);
+	/*DEBUG_INFO5("Card Status %02d -> %X %X %X", reader_index, buffer[5], buffer[6], buffer[7]);
+	DEBUG_INFO5("%X %X %X %X", buffer[0], buffer[1], buffer[2], buffer[3]);*/
 
 	return return_value;
 	

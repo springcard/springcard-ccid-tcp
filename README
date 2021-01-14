@@ -102,8 +102,22 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 History:
 ========
 
-1.4.18 - 09 March 2046, Sylvain ALBERT
+1.4.18 - 09 March 2016, Sylvain ALBERT
     - First public release
       . The library is a copy of the CCID library from Lucovic Rousseau.
       . Remove USB and TwinSerie management.
-      . Add Network management for SpringCard Readers.      
+      . Add Network management for SpringCard Readers.   
+      
+1.4.19 - 28 September 2016, Sylvain ALBERT
+    - Second public release
+      . No read after select fails.
+      . Trace the unsupported message command       
+      
+1.4.19 - 16 November 2016, Sylvain ALBERT
+    - Third public release
+      . CmdNetworkGetSlotStatus modified. Change buffer[7] by reader_index. buffer[7] should be the slot index but not the case on armbian.
+
+1.4.20 - 14 January 2021, Sylvain ALBERT
+    - Fourth public release
+      . Commit from Vincent Jardin.
+      . Fill IFD_bcdDevice, sIFD_iManufacturer, sIFD_serial_number from reader settings.
