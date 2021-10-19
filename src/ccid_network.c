@@ -519,6 +519,7 @@ full_dd:
   rv = read(networkDevice[reader_index].dev_handle,&device_descriptor[offset],DESC_DEVICE_LEN-offset);
   if ( rv != DESC_DEVICE_LEN )
   {
+		offset += rv;
     try++;
     if( rv > 0 && try < 10)
     {
@@ -549,6 +550,7 @@ full_cd:
   rv = read(networkDevice[reader_index].dev_handle,&configuration_descriptor[offset],DESC_CONFIG_LEN-offset);
   if ( rv != DESC_CONFIG_LEN)
   {
+		offset += rv;
 		try++;
     if( rv > 0 && try < 10)
     {
@@ -578,9 +580,11 @@ full_vn:
   rv = read(networkDevice[reader_index].dev_handle,&networkDevice[reader_index].vendor_name[offset],DESC_VENDOR_LEN-offset);
   if( rv != DESC_VENDOR_LEN)
   {
+		offset += rv;
 		try++;
     if( rv > 0 && try < 10)
     {
+			offset += rv;
 			goto full_vn;
 		}
     DEBUG_COMM("Unable to get vendor name");
@@ -609,6 +613,7 @@ full_pn :
   rv = read(networkDevice[reader_index].dev_handle,&networkDevice[reader_index].product_name[offset],DESC_PRODUCT_LEN-offset);
   if ( rv !=  DESC_PRODUCT_LEN)
   {
+		offset += rv;
 		try++;
     if( rv > 0 && try < 10)
     {
@@ -640,6 +645,7 @@ full_sn:
   rv =  read(networkDevice[reader_index].dev_handle,&networkDevice[reader_index].serial_number[offset],DESC_SN_LEN-offset) ;
   if( rv != DESC_SN_LEN)
   {
+		offset += rv;
 		try++;
     if( rv > 0 && try < 10)
     {
