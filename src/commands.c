@@ -96,6 +96,39 @@ static RESPONSECODE CmdXfrBlockTPDU_T1(unsigned int reader_index,
 static void i2dw(int value, unsigned char *buffer);
 static unsigned int bei2i(unsigned char *buffer);
 
+/*****************************************************************************
+ *
+ *					ControlUSB
+ *
+ ****************************************************************************/
+int ControlUSB(int reader_index, int requesttype, int request, int value,
+	unsigned char *bytes, unsigned int size)
+{
+	int ret = 0;
+
+	DEBUG_COMM2("request: 0x%02X", request);
+
+	/*if (0 == (requesttype & 0x80))
+		DEBUG_XXD("send: ", bytes, size);
+
+	ret = libusb_control_transfer(usbDevice[reader_index].dev_handle,
+		requesttype, request, value, usbDevice[reader_index].interface,
+		bytes, size, usbDevice[reader_index].ccid.readTimeout);
+
+	if (ret < 0)
+	{
+		DEBUG_CRITICAL5("control failed (%d/%d): %d %s",
+			usbDevice[reader_index].bus_number,
+			usbDevice[reader_index].device_address, ret, libusb_error_name(ret));
+
+		return ret;
+	}
+
+	if (requesttype & 0x80)
+		DEBUG_XXD("receive: ", bytes, ret);*/
+
+	return ret;
+} /* ControlUSB */
 
 /*****************************************************************************
  *
@@ -184,9 +217,12 @@ RESPONSECODE CmdPowerOn(unsigned int reader_index, unsigned int * nlength,
 		}
 
 		DEBUG_INFO_XXD("Data Block: ", tmp, r);
-		if ((int)*nlength > r-1)
-			*nlength = r-1;
-		memcpy(buffer, tmp+1, *nlength);
+		if (r > 0)
+		{
+			if ((int)*nlength > r-1)
+				*nlength = r-1;
+			memcpy(buffer, tmp+1, *nlength);
+		}
 
 		return IFD_SUCCESS;
 	}
@@ -1461,9 +1497,11 @@ time_request_ICCD_B:
 				DEBUG_CRITICAL2("Unknown bResponseType: 0x%02X", rx_buffer[0]);
 				return IFD_COMMUNICATION_ERROR;
 		}
-
-		memmove(rx_buffer, rx_buffer+1, r-1);
-		*rx_length = r-1;
+		if ( r > 0)
+		{
+			memmove(rx_buffer, rx_buffer+1, r-1);
+			*rx_length = r-1;
+		}
 
 		return IFD_SUCCESS;
 	}
