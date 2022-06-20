@@ -60,6 +60,7 @@
 #define NOT_CONNECTED	0
 #define CONNECTED		1
 
+#define CCID_HEADER_LENGTH	11
 
 /* "usb" descriptors required length */
 #define DESC_DEVICE_LEN								29	
@@ -135,6 +136,10 @@ unsigned char       SET_CONFIGURATION[]   = {EP_Control_To_RDR, SET_CONFIG,     
 #define CCID_INTERRUPT_SIZE 8
 #define CCID_BUFFER_SIZE	1024
 #define SPRINGCARD_MAX_SLOT 8
+
+#define SEND_FLAGS		0
+#define RECV_FLAGS		0
+#define RECV_RETRIES	10
 
 struct networkDevice_MultiSlot_Extension
 {
@@ -220,6 +225,21 @@ static void Multi_PollingTerminate(struct networkDevice_MultiSlot_Extension *msE
 #define PCSCLITE_NAMEKEY_NAME "ifdFriendlyName"
 
 
+/*****************************************************************************
+ *
+ *					_FlushReceiver (if needed)
+ *
+ ****************************************************************************/
+static void _FlushReceiver( unsigned int reader_index )
+{
+	char working_buffer[256]; /* assuming we will never have to receive so much data at setup stage */
+	int rv = 0;
+	rv = recv( networkDevice[reader_index].dev_handle, working_buffer, 256, MSG_DONTWAIT );
+	if (rv > 0)
+	{
+		DEBUG_INFO2("flush socket %d", rv);
+	}
+}
 
 /****************************************************************************/
 /***        clean_endpoint_header                                         ***/
@@ -286,6 +306,75 @@ void init_driver(void)
 }
 
 
+/*****************************************************************************
+ *
+ *			_GetPayloadSize (assuming we have at least the complete header))
+ *
+ ****************************************************************************/
+uint32_t _GetPayloadSize( uint8_t *header )
+{
+	uint32_t datalenght;
+
+	datalenght = header[5];
+	datalenght *= 0x0000100;
+	datalenght += header[4];
+	datalenght *= 0x0000100;
+	datalenght += header[3];
+	datalenght *= 0x0000100;
+	datalenght += header[2];		
+	
+	return datalenght;
+}
+
+int32_t _ReceiveCCIDHeader( unsigned int reader_index, uint8_t *header )
+{
+	int rv = 0;
+
+	/* sanity check */
+	if ( header == NULL ) return -1;
+
+	rv = recv( networkDevice[reader_index].dev_handle, &header[0], CCID_HEADER_LENGTH, RECV_FLAGS );
+	if ( rv != CCID_HEADER_LENGTH )
+	{
+		return rv;
+	}
+	return _GetPayloadSize( header );
+}
+
+int32_t _ReceiveCCIDPayload( unsigned int reader_index, uint8_t *buffer, uint16_t buffer_max_size, uint16_t expected )
+{
+	int offset = 0;
+	int retries = RECV_RETRIES;	
+	int rv;
+	uint8_t need_flush = FALSE;
+
+	if ( expected > buffer_max_size )
+	{
+		expected = buffer_max_size;
+		need_flush = TRUE;
+	}
+
+	while ( offset < expected )
+	{
+		retries--;
+		rv = recv( networkDevice[reader_index].dev_handle, &buffer[offset], expected - offset, RECV_FLAGS );
+		if ( ( rv < 0 ) || !retries )
+		{
+			DEBUG_COMM("Unable to retrieve CCID payload");
+			DEBUG_INFO3("Unable to retrieve CCID payload %d %d", rv, expected);
+			return -1;
+		}		
+		offset += rv;
+	}
+
+	if ( need_flush )
+	{
+		_FlushReceiver( reader_index );
+	}
+	return offset;
+}
+
+
 /****************************************************************************/
 /***        connectToReader                                               ***/
 /****************************************************************************/
@@ -296,6 +385,18 @@ static RESPONSECODE connectToReader(unsigned int reader_index)
   struct hostent *reader;
     
   DEBUG_INFO2("Reader index: %X", reader_index);
+
+	/* means multi slot */
+	if( reader_index > 0)
+	{
+		DEBUG_CRITICAL4("gethostbyname: %d '%s' '%s'", strlen( networkDevice[reader_index].reader_ip ), networkDevice[reader_index].reader_ip, networkDevice[reader_index-1].reader_ip);
+		
+		if ( !strlen( networkDevice[reader_index].reader_ip ) )
+		{
+			memcpy(&networkDevice[reader_index], &networkDevice[reader_index-1], sizeof(_networkDevice));
+			return IFD_SUCCESS;
+		}
+	}
   
   networkDevice[reader_index].dev_handle = socket(AF_INET, SOCK_STREAM, 0);
   if (networkDevice[reader_index].dev_handle < 0)
@@ -347,7 +448,7 @@ static RESPONSECODE connectToReader(unsigned int reader_index)
  ****************************************************************************/
 static RESPONSECODE tryConnection(unsigned int reader_index)
 {
-	char working_buffer[256]; 
+	uint8_t header[ CCID_HEADER_LENGTH ];
 	
 	if (networkDevice[reader_index].dev_handle > 0)
 	{
@@ -357,36 +458,36 @@ static RESPONSECODE tryConnection(unsigned int reader_index)
 	if( connectToReader(reader_index ) == IFD_SUCCESS )
 	{
 
-		// flush socket ?! 
-		int r = read(networkDevice[reader_index].dev_handle,working_buffer, 256);
-		
+		// flush socket ?!
+		_FlushReceiver( reader_index );
+
 		DEBUG_INFO1("Start Configuration");
-		// request set configuration and start reader 
+		// request set configuration and start reader
 		SET_CONFIGURATION[6] = READER_OPTION_START;
-		SET_CONFIGURATION[10] = networkDevice[reader_index].options;  
-		if(write(networkDevice[reader_index].dev_handle,SET_CONFIGURATION,sizeof(SET_CONFIGURATION)) <0)
+		SET_CONFIGURATION[10] = networkDevice[reader_index].options;
+		if (send(networkDevice[reader_index].dev_handle, SET_CONFIGURATION, sizeof(SET_CONFIGURATION), SEND_FLAGS ) < 0)
 		{
-			DEBUG_INFO1("Unable to query set configuration and start the reader");        
+			DEBUG_INFO1("Unable to query set configuration and start the reader");
 			close(networkDevice[reader_index].dev_handle);
 			networkDevice[reader_index].dev_handle = -1;
 			return STATUS_UNSUCCESSFUL;
-		} 
+		}
 
-		if(read(networkDevice[reader_index].dev_handle,working_buffer,DESC_SET_CFG_LEN) < 0)
+		if ( _ReceiveCCIDHeader( reader_index, &header[ 0 ] ) < 0 )
 		{
-			DEBUG_INFO1("Unable to start the reader");              
+			DEBUG_INFO1("Unable to start the reader");
 			close(networkDevice[reader_index].dev_handle);
 			networkDevice[reader_index].dev_handle = -1;
-			return STATUS_UNSUCCESSFUL;    
-		} 
-		
-		if(working_buffer[10] == READER_OPTION_STOP)
+			return STATUS_UNSUCCESSFUL;
+		}
+
+		if (header[10] == READER_OPTION_STOP)
 		{
-			DEBUG_INFO1("Unable to start the reader");              
+			DEBUG_INFO1("Unable to start the reader");
 			close(networkDevice[reader_index].dev_handle);
 			networkDevice[reader_index].dev_handle = -1;
-			return STATUS_UNSUCCESSFUL;    
-		}  
+			return STATUS_UNSUCCESSFUL;
+		}
 		
 		return IFD_SUCCESS;
 	} 
@@ -420,7 +521,6 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
   int return_value = STATUS_SUCCESS;
   char device_descriptor[64];
   char configuration_descriptor[256]; 
-  char working_buffer[256];  
   int cpt=0,cpt2=0;
   int rv = 0;
   char *dashPosition;
@@ -428,7 +528,12 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
   unsigned char option_counter = 0;
   int offset = 0; 
   int try = 0;
-  
+	int expected = 0;
+	uint8_t header[ CCID_HEADER_LENGTH ];
+
+	struct timeval read_wait_timeout;
+  fd_set fds;
+
   DEBUG_INFO3("Reader index: %X, Device: %s", reader_index, device);
   
   
@@ -495,257 +600,176 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
   /* get information about reader */
    
 
-  // flush socket ?! 
-  rv = read(networkDevice[reader_index].dev_handle, working_buffer, 256);
-  if( rv > 0 )
-  {
-		DEBUG_INFO2("flush socket %d", rv);
+/* multi slot reader */
+	if( (reader_index > 0 ) && 
+			(strcmp( networkDevice[reader_index].reader_ip, networkDevice[reader_index-1].reader_ip ) == 0) )
+	{
+		DEBUG_CRITICAL("Multi slot readers");
 	}
+	else
+	{
+		/* get device descriptor */
+		DEBUG_INFO1("get device descriptor");
+		_FlushReceiver( reader_index );
+		rv = send(networkDevice[reader_index].dev_handle, GET_DEVICE, sizeof(GET_DEVICE), SEND_FLAGS );
+		if (rv != sizeof(GET_DEVICE))
+		{
+			DEBUG_COMM("Unable to query device descriptor");
+			DEBUG_INFO3("Unable to query device descriptor %d %ld", rv, sizeof(GET_DEVICE));
+			goto failure;
+		}
+		if ( (expected = _ReceiveCCIDHeader( reader_index, &header[ 0 ] ) ) < 0 )
+			goto failure;
+		if ( _ReceiveCCIDPayload( reader_index, &device_descriptor[0], sizeof( device_descriptor ), expected ) < 0 )
+			goto failure;
+
+		/* get device configuration */
+		DEBUG_INFO1("get device configuration");
+		rv = send(networkDevice[reader_index].dev_handle, GET_CONFIG, sizeof(GET_CONFIG), SEND_FLAGS );
+		if (rv != sizeof(GET_CONFIG))
+		{
+			DEBUG_COMM("Unable to query configuration descriptor");
+			DEBUG_INFO3("Unable to query configuration descriptor %d %ld", rv, sizeof(GET_CONFIG));
+			goto failure;
+		}
+		if ( (expected = _ReceiveCCIDHeader( reader_index, &header[ 0 ] ) ) < 0 )
+			goto failure;
+		if ( _ReceiveCCIDPayload( reader_index, &configuration_descriptor[0], sizeof( configuration_descriptor ), expected ) < 0 )
+			goto failure;
+		/* do some cleaning */
+		memcpy( &configuration_descriptor[0], &configuration_descriptor[18], (expected - 18) );
+		
+		/* get device vendor name */
+		DEBUG_INFO1("get device vendor name");
+		rv = send(networkDevice[reader_index].dev_handle, GET_VENDOR_NAME, sizeof(GET_VENDOR_NAME), SEND_FLAGS );
+		if (rv != sizeof(GET_VENDOR_NAME))
+		{
+			DEBUG_COMM("Unable to query vendor name");
+			DEBUG_INFO3("Unable to query vendor name %d %ld", rv, sizeof(GET_VENDOR_NAME));
+			goto failure;
+		}
+		if ( (expected = _ReceiveCCIDHeader( reader_index, &header[ 0 ] ) ) < 0 )
+			goto failure;
+		if ( _ReceiveCCIDPayload( reader_index, &networkDevice[reader_index].vendor_name[0], 
+			sizeof( networkDevice[reader_index].vendor_name ), expected ) < 0 )
+			goto failure;
+		get_string_descriptor_string(networkDevice[reader_index].vendor_name);	
+
+		/* get device product name */
+		DEBUG_INFO1("get device product name");
+		rv = send(networkDevice[reader_index].dev_handle, GET_PRODUCT_NAME, sizeof(GET_PRODUCT_NAME), SEND_FLAGS );
+		if (rv != sizeof(GET_PRODUCT_NAME))
+		{
+			DEBUG_COMM("Unable to query product name");
+			DEBUG_INFO3("Unable to query product name %d %ld", rv, sizeof(GET_PRODUCT_NAME));
+			goto failure;
+		}
+		if ( (expected = _ReceiveCCIDHeader( reader_index, &header[ 0 ] ) ) < 0 )
+			goto failure;
+		if ( _ReceiveCCIDPayload( reader_index, &networkDevice[reader_index].product_name[0], 
+			sizeof( networkDevice[reader_index].product_name ), expected ) < 0 )
+			goto failure;
+		get_string_descriptor_string(networkDevice[reader_index].product_name);
+
+		/* get device serial number */
+		DEBUG_INFO1("get device serial number");
+		rv = send(networkDevice[reader_index].dev_handle, GET_SERIAL_NUMBER, sizeof(GET_SERIAL_NUMBER), SEND_FLAGS );
+		if (rv != sizeof(GET_SERIAL_NUMBER))
+		{
+			DEBUG_COMM("Unable to query serial number");
+			DEBUG_INFO3("Unable to query serial number %d %ld", rv, sizeof(GET_SERIAL_NUMBER));
+			goto failure;
+		}
+		if ( (expected = _ReceiveCCIDHeader( reader_index, &header[ 0 ] ) ) < 0 )
+			goto failure;
+		if ( _ReceiveCCIDPayload( reader_index, &networkDevice[reader_index].serial_number[0], 
+			sizeof( networkDevice[reader_index].serial_number ), expected ) < 0 )
+			goto failure;
+		get_string_descriptor_string(networkDevice[reader_index].serial_number);
+
+  
+		DEBUG_INFO2("Vendor Name  : %s",networkDevice[reader_index].vendor_name);  
+		DEBUG_INFO2("Product Name : %s",networkDevice[reader_index].product_name);  
+		DEBUG_INFO2("Serial Number: %s",networkDevice[reader_index].serial_number);   
+	
+		DEBUG_INFO2("dwFeatures : 0x%04x",dw2i(configuration_descriptor, 40));  
+		DEBUG_INFO5("dwFeatures : %02X %02X %02X %02X ",configuration_descriptor[40], configuration_descriptor[41], configuration_descriptor[42], configuration_descriptor[43]);
+			
+		DEBUG_INFO1("Start Configuration");
+  	/* request set configuration and start reader */
+		SET_CONFIGURATION[6] = READER_OPTION_START;
+		SET_CONFIGURATION[10] = networkDevice[reader_index].options;
+		if (send(networkDevice[reader_index].dev_handle, SET_CONFIGURATION, sizeof(SET_CONFIGURATION), SEND_FLAGS ) < 0)
+		{
+			DEBUG_INFO1("Unable to query set configuration and start the reader");
+			goto failure;
+		}
+
+		if ( (expected = _ReceiveCCIDHeader( reader_index, &header[ 0 ] ) ) < 0 )
+		{
+			DEBUG_INFO1("Unable to start the reader");
+			goto failure;
+		}
+		if (header[10] == READER_OPTION_STOP)
+		{
+			DEBUG_INFO1("Unable to start the reader");
+			goto failure;
+		}
+	
     
-  // query for reader informations 
-  rv = write(networkDevice[reader_index].dev_handle,GET_DEVICE,sizeof(GET_DEVICE));
-  if ( rv != sizeof(GET_DEVICE))
-  {    
-    DEBUG_COMM("Unable to query device descriptor");  
-    DEBUG_INFO3("Unable to query device descriptor %d %ld", rv, sizeof(GET_DEVICE) );     
-    
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;
-  }  
-  offset = 0; 
-  try = 0;  
-full_dd: 
-  rv = read(networkDevice[reader_index].dev_handle,&device_descriptor[offset],DESC_DEVICE_LEN-offset);
-  if ( rv != DESC_DEVICE_LEN )
-  {
-		offset += rv;
-    try++;
-    if( rv > 0 && try < 10)
-    {
-			goto full_dd;
-		}
-    DEBUG_COMM("Unable to get proper device descriptor");  
-    DEBUG_INFO3("Unable to get proper device descriptor %d %d", rv, DESC_DEVICE_LEN ); 
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;    
-  }
-  clean_endpoint_header(device_descriptor,0,DESC_DEVICE_LEN);
-      
-  // query for reader configuration 
-  rv = write(networkDevice[reader_index].dev_handle,GET_CONFIG,sizeof(GET_CONFIG));
-  if ( rv != sizeof(GET_CONFIG) )
-  {
-    DEBUG_COMM("Unable to query configuration descriptor");    
-    DEBUG_INFO3("Unable to query configuration descriptor %d %ld", rv, sizeof(GET_CONFIG) );     
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;
-  }   
-  
-full_cd: 
-  offset = 0; 
-  try = 0;   
-  rv = read(networkDevice[reader_index].dev_handle,&configuration_descriptor[offset],DESC_CONFIG_LEN-offset);
-  if ( rv != DESC_CONFIG_LEN)
-  {
-		offset += rv;
-		try++;
-    if( rv > 0 && try < 10)
-    {
-			goto full_cd;
-		}
-    DEBUG_COMM("Unable to get proper configuration descriptor");
-    DEBUG_INFO3("Unable to get proper configuration descriptor %d %d", rv, DESC_CONFIG_LEN ); 
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;    
-  } 
-  clean_endpoint_header(configuration_descriptor,18,DESC_CONFIG_LEN);
-  
-  // query for vendor name 
-  rv = write(networkDevice[reader_index].dev_handle,GET_VENDOR_NAME,sizeof(GET_VENDOR_NAME));
-  if ( rv != sizeof(GET_VENDOR_NAME))
-  {
-    DEBUG_COMM("Unable to query vendor name");      
-    DEBUG_INFO3("Unable to query vendor name %d %ld", rv, sizeof(GET_VENDOR_NAME) );   
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;
-  }    
-  offset = 0; 
-  try = 0; 
-full_vn: 
-  rv = read(networkDevice[reader_index].dev_handle,&networkDevice[reader_index].vendor_name[offset],DESC_VENDOR_LEN-offset);
-  if( rv != DESC_VENDOR_LEN)
-  {
-		offset += rv;
-		try++;
-    if( rv > 0 && try < 10)
-    {
-			offset += rv;
-			goto full_vn;
-		}
-    DEBUG_COMM("Unable to get vendor name");
-    DEBUG_INFO3("Unable to get vendor name %d %d", rv, DESC_VENDOR_LEN );
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return IFD_COMMUNICATION_ERROR;    
-  } 
-  clean_endpoint_header(networkDevice[reader_index].vendor_name,0,DESC_VENDOR_LEN);
-  get_string_descriptor_string(networkDevice[reader_index].vendor_name);
+		// create descriptors based on network informations 
+		networkDevice[reader_index].vendorID                        = device_descriptor[8]<<8|device_descriptor[9];
+		networkDevice[reader_index].productID                       = device_descriptor[10]<<8|device_descriptor[11];
+		networkDevice[reader_index].bcdDevice                       = (device_descriptor[12]<<8|device_descriptor[13])<<16;
+		
+		networkDevice[reader_index].ccid.real_bSeq                  = 0;
+		networkDevice[reader_index].ccid.pbSeq                      = &networkDevice[reader_index].ccid.real_bSeq;  
+		networkDevice[reader_index].ccid.readerID                   = (networkDevice[reader_index].vendorID << 16) + networkDevice[reader_index].productID;
+	
+		networkDevice[reader_index].ccid.dwFeatures     						= dw2i(configuration_descriptor,40);
+		networkDevice[reader_index].ccid.wLcdLayout                 =	(configuration_descriptor[51] << 8) 
+																																				+ configuration_descriptor[50];
+		networkDevice[reader_index].ccid.bPINSupport                = configuration_descriptor[52];
+		networkDevice[reader_index].ccid.dwMaxCCIDMessageLength     = dw2i(configuration_descriptor, 44);
+		networkDevice[reader_index].ccid.dwMaxIFSD                  = dw2i(configuration_descriptor, 28);
+		networkDevice[reader_index].ccid.dwDefaultClock             = dw2i(configuration_descriptor, 10);
+		networkDevice[reader_index].ccid.dwMaxDataRate              = dw2i(configuration_descriptor, 23);
+		networkDevice[reader_index].ccid.bMaxSlotIndex              = configuration_descriptor[4];
+		networkDevice[reader_index].ccid.bCurrentSlotIndex          = 0;
+		networkDevice[reader_index].ccid.readTimeout                = DEFAULT_COM_READ_TIMEOUT;
+		
+		networkDevice[reader_index].ccid.arrayOfSupportedDataRates  = NULL;
+		networkDevice[reader_index].ccid.bInterfaceProtocol         = 0;
+		networkDevice[reader_index].ccid.bNumEndpoints              = 0; // 3 to force to use own pooling thread 0;
+		networkDevice[reader_index].ccid.dwSlotStatus               = IFD_ICC_PRESENT;
+		networkDevice[reader_index].ccid.bVoltageSupport            = configuration_descriptor[5];
+		networkDevice[reader_index].ccid.sIFD_serial_number         = networkDevice[reader_index].serial_number; //NULL;
+		networkDevice[reader_index].ccid.gemalto_firmware_features  = NULL;
+		networkDevice[reader_index].ccid.sIFD_iManufacturer					= networkDevice[reader_index].vendor_name;
 
-  // query for product name 
-  rv = write(networkDevice[reader_index].dev_handle,GET_PRODUCT_NAME,sizeof(GET_PRODUCT_NAME));
-  if ( rv != sizeof(GET_PRODUCT_NAME) )
-  {
-    DEBUG_COMM("Unable to query product name");     
-    DEBUG_INFO3("Unable to query product name %d %ld", rv, sizeof(GET_PRODUCT_NAME) );  
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;
-  }    
-  
-  offset = 0; 
-  try = 0;  
-full_pn :
-  rv = read(networkDevice[reader_index].dev_handle,&networkDevice[reader_index].product_name[offset],DESC_PRODUCT_LEN-offset);
-  if ( rv !=  DESC_PRODUCT_LEN)
-  {
-		offset += rv;
-		try++;
-    if( rv > 0 && try < 10)
-    {
-			goto full_pn;
-		}
-    DEBUG_COMM("Unable to get product name");       
-    DEBUG_INFO3("Unable to get product name %d %d", rv, DESC_PRODUCT_LEN ); 
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;    
-  } 
-  clean_endpoint_header(networkDevice[reader_index].product_name,0,DESC_PRODUCT_LEN);
-  get_string_descriptor_string(networkDevice[reader_index].product_name);
+		/* Vendor-supplied interface device version (DWORD in the form
+					* 0xMMmmbbbb where MM = major version, mm = minor version, and
+					* bbbb = build number). */
+		networkDevice[reader_index].ccid.IFD_bcdDevice							= device_descriptor[13]<<24 | device_descriptor[12] << 16;
+		
+		networkDevice[reader_index].real_nb_opened_slots = (int) (networkDevice[reader_index].ccid.bMaxSlotIndex) + 1 ;
+		networkDevice[reader_index].nb_opened_slots = &networkDevice[reader_index].real_nb_opened_slots;
 
-  // query for serial number 
-  rv = write(networkDevice[reader_index].dev_handle,GET_SERIAL_NUMBER,sizeof(GET_SERIAL_NUMBER));
-  if ( rv != sizeof(GET_SERIAL_NUMBER))
-  {
-    DEBUG_COMM("Unable to query serial number");   
-    DEBUG_INFO3("Unable to query serial number %d %ld", rv, sizeof(GET_SERIAL_NUMBER) );     
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;
-  }    
-  
-  offset = 0; 
-  try = 0; 
-full_sn: 
-  rv =  read(networkDevice[reader_index].dev_handle,&networkDevice[reader_index].serial_number[offset],DESC_SN_LEN-offset) ;
-  if( rv != DESC_SN_LEN)
-  {
-		offset += rv;
-		try++;
-    if( rv > 0 && try < 10)
-    {
-			goto full_sn;
-		}
-    DEBUG_COMM("Unable to get serial number");        
-    DEBUG_INFO3("Unable to get serial number %d %d", rv, DESC_SN_LEN );        
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;    
-  } 
-  clean_endpoint_header(networkDevice[reader_index].serial_number,0,DESC_SN_LEN);
-  get_string_descriptor_string(networkDevice[reader_index].serial_number);
-  
-  
-  DEBUG_INFO2("Vendor Name  : %s",networkDevice[reader_index].vendor_name);  
-  DEBUG_INFO2("Product Name : %s",networkDevice[reader_index].product_name);  
-  DEBUG_INFO2("Serial Number: %s",networkDevice[reader_index].serial_number);   
-  
-  //CCID_CLASS_SHORT_APDU
-  //configuration_descriptor[42] = 0x02;
-  
-  DEBUG_INFO2("dwFeatures : 0x%04x",dw2i(configuration_descriptor, 40));  
-  DEBUG_INFO5("dwFeatures : %02X %02X %02X %02X ",configuration_descriptor[40], configuration_descriptor[41], configuration_descriptor[42], configuration_descriptor[43]);
-    
-  DEBUG_INFO1("Start Configuration");
-  // request set configuration and start reader 
-  SET_CONFIGURATION[6] = READER_OPTION_START;
-  SET_CONFIGURATION[10] = networkDevice[reader_index].options;  
-  if(write(networkDevice[reader_index].dev_handle,SET_CONFIGURATION,sizeof(SET_CONFIGURATION)) <0)
-  {
-    DEBUG_INFO1("Unable to query set configuration and start the reader");        
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;
-  }      
-
-  if(read(networkDevice[reader_index].dev_handle,working_buffer,DESC_SET_CFG_LEN) < 0)
-  {
-    DEBUG_INFO1("Unable to start the reader");              
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;    
-  } 
-  if(working_buffer[10] == READER_OPTION_STOP)
-  {
-    DEBUG_INFO1("Unable to start the reader");              
-    close(networkDevice[reader_index].dev_handle);
-    networkDevice[reader_index].dev_handle = -1;
-    return STATUS_UNSUCCESSFUL;    
-  }    
-    
-  // create descriptors based on network informations 
-  networkDevice[reader_index].vendorID                        = device_descriptor[8]<<8|device_descriptor[9];
-  networkDevice[reader_index].productID                       = device_descriptor[10]<<8|device_descriptor[11];
-  networkDevice[reader_index].bcdDevice                       = (device_descriptor[12]<<8|device_descriptor[13])<<16;
-  
-  networkDevice[reader_index].ccid.real_bSeq                  = 0;
-  networkDevice[reader_index].ccid.pbSeq                      = &networkDevice[reader_index].ccid.real_bSeq;  
-  networkDevice[reader_index].ccid.readerID                   = (networkDevice[reader_index].vendorID << 16) + networkDevice[reader_index].productID;
- 
-  networkDevice[reader_index].ccid.dwFeatures     						= dw2i(configuration_descriptor,40);
-  networkDevice[reader_index].ccid.wLcdLayout                 =	(configuration_descriptor[51] << 8) 
-                                                                      + configuration_descriptor[50];
-  networkDevice[reader_index].ccid.bPINSupport                = configuration_descriptor[52];
-  networkDevice[reader_index].ccid.dwMaxCCIDMessageLength     = dw2i(configuration_descriptor, 44);
-  networkDevice[reader_index].ccid.dwMaxIFSD                  = dw2i(configuration_descriptor, 28);
-  networkDevice[reader_index].ccid.dwDefaultClock             = dw2i(configuration_descriptor, 10);
-  networkDevice[reader_index].ccid.dwMaxDataRate              = dw2i(configuration_descriptor, 23);
-  networkDevice[reader_index].ccid.bMaxSlotIndex              = configuration_descriptor[4];
-  networkDevice[reader_index].ccid.bCurrentSlotIndex          = 0;
-  networkDevice[reader_index].ccid.readTimeout                = DEFAULT_COM_READ_TIMEOUT;
-  
-  networkDevice[reader_index].ccid.arrayOfSupportedDataRates  = NULL;
-  networkDevice[reader_index].ccid.bInterfaceProtocol         = 0;
-  networkDevice[reader_index].ccid.bNumEndpoints              = 0; // 3 to force to use own pooling thread 0;
-  networkDevice[reader_index].ccid.dwSlotStatus               = IFD_ICC_PRESENT;
-  networkDevice[reader_index].ccid.bVoltageSupport            = configuration_descriptor[5];
-  networkDevice[reader_index].ccid.sIFD_serial_number         = networkDevice[reader_index].serial_number; //NULL;
-  networkDevice[reader_index].ccid.gemalto_firmware_features  = NULL;
-  networkDevice[reader_index].ccid.sIFD_iManufacturer					= networkDevice[reader_index].vendor_name;
-
-	/* Vendor-supplied interface device version (DWORD in the form
-				 * 0xMMmmbbbb where MM = major version, mm = minor version, and
-				 * bbbb = build number). */
-	networkDevice[reader_index].ccid.IFD_bcdDevice							= device_descriptor[13]<<24 | device_descriptor[12] << 16;
-  
-	networkDevice[reader_index].real_nb_opened_slots = (int) (networkDevice[reader_index].ccid.bMaxSlotIndex) + 1 ;
-  networkDevice[reader_index].nb_opened_slots = &networkDevice[reader_index].real_nb_opened_slots;
-
-   DEBUG_INFO2("IFD_bcdDevice " DWORD_X "", networkDevice[reader_index].ccid.IFD_bcdDevice); 
-	 DEBUG_INFO2("sIFD_serial_number " DWORD_X "", networkDevice[reader_index].ccid.sIFD_serial_number); 
-   
-  networkDevice[reader_index].status =  CONNECTED;
-  
-  /* Init thread that read continuously  */
-  networkDevice[reader_index].multislot_extension = Multi_CreateFirstSlot(reader_index);
-
+		DEBUG_INFO2("IFD_bcdDevice " DWORD_X "", networkDevice[reader_index].ccid.IFD_bcdDevice); 
+		DEBUG_INFO2("sIFD_serial_number " DWORD_X "", networkDevice[reader_index].ccid.sIFD_serial_number); 
+		
+		networkDevice[reader_index].status =  CONNECTED;
+		
+		/* Init thread that read continuously  */
+		networkDevice[reader_index].multislot_extension = Multi_CreateFirstSlot(reader_index);
+	}
   
   return STATUS_SUCCESS;
+
+failure:
+	close(networkDevice[reader_index].dev_handle);
+	networkDevice[reader_index].dev_handle = -1;
+	return STATUS_UNSUCCESSFUL;
 } /* OpenNETWORKByName */
 
 
@@ -773,11 +797,24 @@ status_t WriteNetwork(unsigned int reader_index, unsigned int length, unsigned c
 	/* make ccid command like usb */
 	if ( buffer[0] == PC_To_RDR_IccPowerOn)
 	{
-		cmd_to_send[0] = EP_Bulk_PC_To_RDR;	
-		snprintf( debug_header, 256, "PC_To_RDR_IccPowerOn");
-		if( networkDevice[reader_index].multislot_extension != NULL )
+		cmd_to_send[0] = EP_Bulk_PC_To_RDR;
+		snprintf(debug_header, 256, "PC_To_RDR_IccPowerOn");
+		if (networkDevice[reader_index].multislot_extension != NULL)
 		{
-			networkDevice[reader_index].multislot_extension->power_on_in_progress[(int)buffer[5]] = 1;
+			if( (reader_index > 0 ) && 
+					(strcmp( networkDevice[reader_index].reader_ip, networkDevice[reader_index-1].reader_ip ) == 0) )
+			{
+				networkDevice[reader_index-1].multislot_extension->power_on_in_progress[(int)buffer[5]] = 1;
+				buffer[5] = (BYTE) reader_index;
+			}
+			else
+			{
+				networkDevice[reader_index].multislot_extension->power_on_in_progress[(int)buffer[5]] = 1;
+			}
+			
+			snprintf( debug_header, 256, "%d %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X ", 
+						reader_index, buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7], buffer[8], buffer[9]);
+						DEBUG_CRITICAL2("%s", debug_header);
 		}
 	}
 	else if ( buffer[0] == PC_To_RDR_IccPowerOff)
@@ -1108,8 +1145,7 @@ status_t CloseNetwork(unsigned int reader_index)
 int InterruptRead(int reader_index, int timeout /* in ms */)
 {
 	
-	DEBUG_INFO3("################%d %d ms", reader_index, timeout);
-	
+	DEBUG_INFO3("################%d %d ms", reader_index, timeout);	
 
 	/* Multislot reader: redirect to Multi_InterrupRead */
 	/*if (networkDevice[reader_index].multislot_extension != NULL)
