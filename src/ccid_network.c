@@ -55,7 +55,7 @@
 
 /* driver informations */
 #define LIB_NAME										"SpringcardNetworkCCID"
-#define LIB_VERSION										"1.4.20"
+#define LIB_VERSION										"1.4.21"
 
 #define NOT_CONNECTED	0
 #define CONNECTED		1

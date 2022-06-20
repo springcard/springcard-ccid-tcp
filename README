@@ -121,3 +121,9 @@ History:
     - Fourth public release
       . Commit from Vincent Jardin.
       . Fill IFD_bcdDevice, sIFD_iManufacturer, sIFD_serial_number from reader settings.
+
+1.4.21 - 20 June 2022, Sylvain ALBERT
+    - Public release
+      . Commit from Matthieu Barreteau.
+      . Reliable string CCID enumeration at startup.
+      . Add basic multislot management for SpringPark.
