@@ -66,7 +66,7 @@ static CcidDesc CcidSlots[CCID_DRIVER_MAX_READERS];
 static pthread_mutex_t ifdh_context_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
 
-int LogLevel = DEBUG_LEVEL_CRITICAL | DEBUG_LEVEL_INFO;
+int LogLevel = DEBUG_LEVEL_CRITICAL;
 int DriverOptions = 0;
 int PowerOnVoltage = VOLTAGE_5V;
 static int DebugInitialized = FALSE;
@@ -1960,6 +1960,7 @@ void init_driver(void)
 		}
 
 		bundleRelease(&plist);
+		DriverOptions |= DRIVER_OPTION_CCID_EXCHANGE_AUTHORIZED;
 	}
 
 	e = getenv("LIBCCID_ifdLogLevel");

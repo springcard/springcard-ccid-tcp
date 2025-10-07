@@ -1574,10 +1574,10 @@ time_request:
 	}
 
 	length = dw2i(cmd, 1);
-	DEBUG_INFO3("trame_size %d %d", length, *rx_length);
+	/*DEBUG_INFO3("trame_size %d %d", length, *rx_length);
 			DEBUG_INFO5("%X %X %X %X", cmd[0], cmd[1], cmd[2], cmd[3]);
 			DEBUG_INFO5("%X %X %X %X", cmd[4], cmd[5], cmd[6], cmd[7]);
-			DEBUG_INFO5("%X %X %X %X", cmd[8], cmd[9], cmd[10], cmd[11]);
+			DEBUG_INFO5("%X %X %X %X", cmd[8], cmd[9], cmd[10], cmd[11]);*/
 	if (length <= *rx_length)
 		*rx_length = length;
 	else

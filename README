@@ -127,3 +127,13 @@ History:
       . Commit from Matthieu Barreteau.
       . Reliable string CCID enumeration at startup.
       . Add basic multislot management for SpringPark.
+
+1.4.22 - 05 March 2025, Sylvain ALBERT
+    - Public release
+      . Improve basic multislot management for SpringPark.
+      . Correct Bug connect/deconnect reader.
+
+1.4.23 - 23 September 2025, Sylvain ALBERT
+    - Public release
+      . Fix issue pthread_cond_wait.
+      . Fix issue concurrent access to reader.
