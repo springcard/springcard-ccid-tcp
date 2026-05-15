@@ -1442,6 +1442,13 @@ static void *Multi_PollingProc(void *p_ext)
 			}
 			else if (receive_buffer[0] == EP_Interrupt)
 			{
+				if (trame_size < 12)
+				{
+					DEBUG_CRITICAL2("Short frame: %u", trame_size);
+					offset = 0;
+					goto select_again;
+				}
+
 				if (deal == -1)
 				{
 					deal = trame_size;
@@ -1497,6 +1504,12 @@ static void *Multi_PollingProc(void *p_ext)
 			else
 			{
 				DEBUG_INFO2("Unknow code %X", receive_buffer[0]);
+			}
+			if (trame_size < 11)
+			{
+				DEBUG_CRITICAL2("Short CCID response: %u", trame_size);
+				offset = 0;
+				goto select_again;
 			}
 			trame_size--;
 
