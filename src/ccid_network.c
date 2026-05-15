@@ -993,11 +993,11 @@ status_t isBufferComplete(unsigned char *buffer, unsigned int size, int *deal)
 	datalenght *= 0x0000100;
 	datalenght += buffer[2];
 
-	if (datalenght > 0x0010000)
+	if (datalenght > CCID_BUFFER_SIZE - 11)
 	{
-		DEBUG_INFO2("Error %d", datalenght);
+		DEBUG_CRITICAL2("Invalid CCID payload length: %u", datalenght);
 		*deal = 0;
-		return STATUS_SUCCESS;
+		return STATUS_UNSUCCESSFUL;
 	}
 	if (size == (11 + datalenght))
 	{
