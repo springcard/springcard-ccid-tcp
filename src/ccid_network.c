@@ -72,6 +72,7 @@
 
 /* network default port */
 #define READER_SOCKET_PORT 3999
+#define READER_DEFAULT_SLOTS 1
 
 /* start or not the reader (SET CONFIGURATION) */
 #define READER_OPTION_STOP 0
@@ -182,8 +183,9 @@ typedef struct
 	 */
 	int dev_handle;
 	int status;
-	char reader_ip[16];
+	char reader_ip[256];
 	unsigned int reader_port;
+	unsigned int configured_slots;
 
 	/* descriptors and common informations */
 	int vendorID;
@@ -209,6 +211,8 @@ static unsigned char driver_setup_is_done = 0;
 /* Specific hooks for multislot readers */
 static struct networkDevice_MultiSlot_Extension *Multi_CreateFirstSlot(int reader_index);
 static void Multi_PollingTerminate(struct networkDevice_MultiSlot_Extension *msExt);
+
+static status_t ParseNetworkDeviceName(unsigned int reader_index, /*@null@*/ const char *device);
 
 #define PCSCLITE_MANUKEY_NAME "ifdVendorID"
 #define PCSCLITE_PRODKEY_NAME "ifdProductID"
@@ -499,6 +503,186 @@ static RESPONSECODE tryConnection(unsigned int reader_index)
 	return STATUS_UNSUCCESSFUL;
 }
 
+static int ParseUnsignedOption(const char *value, unsigned long min_value, unsigned long max_value, unsigned int *result)
+{
+	char *endptr = NULL;
+	unsigned long parsed;
+
+	if ((value == NULL) || (*value == '\0') || (result == NULL))
+		return -1;
+
+	errno = 0;
+	parsed = strtoul(value, &endptr, 0);
+	if ((errno != 0) || (endptr == value) || (*endptr != '\0') || (parsed < min_value) || (parsed > max_value))
+		return -1;
+
+	*result = (unsigned int)parsed;
+	return 0;
+}
+
+static status_t SetNetworkDeviceHost(unsigned int reader_index, const char *host)
+{
+	if ((host == NULL) || (*host == '\0') ||
+		(strlen(host) >= sizeof(networkDevice[reader_index].reader_ip)))
+		return STATUS_UNSUCCESSFUL;
+
+	snprintf(networkDevice[reader_index].reader_ip,
+		sizeof(networkDevice[reader_index].reader_ip), "%s", host);
+	return STATUS_SUCCESS;
+}
+
+static status_t ParseNamedNetworkDeviceToken(unsigned int reader_index, const char *token, int *host_is_set)
+{
+	const char *value;
+	size_t name_len;
+	unsigned int parsed;
+
+	value = strchr(token, '=');
+	if (value == NULL)
+	{
+		if (*host_is_set)
+			return STATUS_UNSUCCESSFUL;
+
+		if (SetNetworkDeviceHost(reader_index, token) != STATUS_SUCCESS)
+			return STATUS_UNSUCCESSFUL;
+		*host_is_set = TRUE;
+		return STATUS_SUCCESS;
+	}
+
+	name_len = (size_t)(value - token);
+	value++;
+
+	if ((name_len == 0) || (*value == '\0'))
+		return STATUS_UNSUCCESSFUL;
+
+	if ((name_len == 4) && (strncmp(token, "host", name_len) == 0))
+	{
+		if (*host_is_set || (SetNetworkDeviceHost(reader_index, value) != STATUS_SUCCESS))
+			return STATUS_UNSUCCESSFUL;
+		*host_is_set = TRUE;
+	}
+	else if ((name_len == 4) && (strncmp(token, "port", name_len) == 0))
+	{
+		if (ParseUnsignedOption(value, 1, 65535, &parsed) != 0)
+			return STATUS_UNSUCCESSFUL;
+		networkDevice[reader_index].reader_port = parsed;
+	}
+	else if ((name_len == 7) && (strncmp(token, "options", name_len) == 0))
+	{
+		if (ParseUnsignedOption(value, 0, 0xFF, &parsed) != 0)
+			return STATUS_UNSUCCESSFUL;
+		networkDevice[reader_index].options = (unsigned char)parsed;
+	}
+	else if ((name_len == 3) && (strncmp(token, "key", name_len) == 0))
+	{
+		snprintf(networkDevice[reader_index].key,
+			sizeof(networkDevice[reader_index].key), "%s", value);
+	}
+	else if ((name_len == 5) && (strncmp(token, "slots", name_len) == 0))
+	{
+		if (ParseUnsignedOption(value, 1, SPRINGCARD_MAX_SLOT, &parsed) != 0)
+			return STATUS_UNSUCCESSFUL;
+		networkDevice[reader_index].configured_slots = parsed;
+	}
+	else
+	{
+		return STATUS_UNSUCCESSFUL;
+	}
+
+	return STATUS_SUCCESS;
+}
+
+static status_t ParseNetworkDeviceName(unsigned int reader_index, /*@null@*/ const char *device)
+{
+	char *readerNameTokens;
+	char *token;
+	char *next;
+	int named_mode;
+	int host_is_set = FALSE;
+	unsigned int legacy_index = 0;
+	unsigned int parsed;
+	status_t status = STATUS_SUCCESS;
+
+	if ((device == NULL) || (*device == '\0'))
+		return STATUS_UNSUCCESSFUL;
+
+	readerNameTokens = strdup(device);
+	if (readerNameTokens == NULL)
+		return STATUS_UNSUCCESSFUL;
+
+	named_mode = (strchr(readerNameTokens, '=') != NULL);
+	token = readerNameTokens;
+	while (token != NULL)
+	{
+		next = strchr(token, ':');
+		if (next != NULL)
+			*next++ = '\0';
+
+		if (*token == '\0')
+		{
+			status = STATUS_UNSUCCESSFUL;
+			break;
+		}
+
+		if (named_mode)
+		{
+			status = ParseNamedNetworkDeviceToken(reader_index, token, &host_is_set);
+			if (status != STATUS_SUCCESS)
+				break;
+		}
+		else
+		{
+			switch (legacy_index)
+			{
+			case 0:
+				if (SetNetworkDeviceHost(reader_index, token) != STATUS_SUCCESS)
+					status = STATUS_UNSUCCESSFUL;
+				else
+					host_is_set = TRUE;
+				break;
+			case 1:
+				if (ParseUnsignedOption(token, 1, 65535, &parsed) != 0)
+					status = STATUS_UNSUCCESSFUL;
+				else
+					networkDevice[reader_index].reader_port = parsed;
+				break;
+			case 2:
+				if (ParseUnsignedOption(token, 0, 0xFF, &parsed) != 0)
+					status = STATUS_UNSUCCESSFUL;
+				else
+					networkDevice[reader_index].options = (unsigned char)parsed;
+				break;
+			case 3:
+				snprintf(networkDevice[reader_index].key,
+					sizeof(networkDevice[reader_index].key), "%s", token);
+				break;
+			default:
+				status = STATUS_UNSUCCESSFUL;
+				break;
+			}
+
+			if (status != STATUS_SUCCESS)
+				break;
+			legacy_index++;
+		}
+
+		token = next;
+	}
+
+	free(readerNameTokens);
+
+	if ((status != STATUS_SUCCESS) || !host_is_set)
+		return STATUS_UNSUCCESSFUL;
+
+	DEBUG_INFO2("Reader host is %s", networkDevice[reader_index].reader_ip);
+	DEBUG_INFO2("TCP port %d", networkDevice[reader_index].reader_port);
+	DEBUG_INFO2("Reader option 0x%02x", networkDevice[reader_index].options);
+	DEBUG_INFO2("Reader key %s", networkDevice[reader_index].key);
+	DEBUG_INFO2("Reader slots %d", networkDevice[reader_index].configured_slots);
+
+	return STATUS_SUCCESS;
+}
+
 /*****************************************************************************
  *
  *					OpenNetwork
@@ -526,9 +710,6 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
 	char configuration_descriptor[256];
 	int cpt = 0, cpt2 = 0;
 	int rv = 0;
-	char *dashPosition;
-	char *startfind = device;
-	unsigned char option_counter = 0;
 	int offset = 0;
 	int try = 0;
 	int expected = 0;
@@ -537,57 +718,20 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
 	struct timeval read_wait_timeout;
 	fd_set fds;
 
-	DEBUG_INFO3("Reader index: %X, Device: %s", reader_index, device);
+	DEBUG_INFO3("Reader index: %X, Device: %s", reader_index, device ? device : "(null)");
 
 	/* setup driver once when first call*/
 	init_driver();
 
 	networkDevice[reader_index].reader_port = READER_SOCKET_PORT;
 	networkDevice[reader_index].options = 0x00;
+	networkDevice[reader_index].configured_slots = READER_DEFAULT_SLOTS;
 	networkDevice[reader_index].key[0] = '\0';
 
-	/* look for port in device name */
-	dashPosition = strchr(startfind, ':');
-	while (dashPosition != NULL && option_counter < 4)
+	if (ParseNetworkDeviceName(reader_index, device) != STATUS_SUCCESS)
 	{
-		*dashPosition = '\0';
-		switch (option_counter)
-		{
-		case 0:
-		{
-			/* save device IP */
-			snprintf(networkDevice[reader_index].reader_ip, 16, "%s", startfind);
-			DEBUG_INFO2("Reader IP is %s", networkDevice[reader_index].reader_ip);
-		}
-		break;
-
-		case 1:
-		{
-			/* save device IP */
-			networkDevice[reader_index].reader_port = atoi(startfind);
-			DEBUG_INFO2("TCP port %d", networkDevice[reader_index].reader_port);
-		}
-		break;
-
-		case 2:
-		{
-			/* save device option */
-			networkDevice[reader_index].options = atoi(startfind);
-			DEBUG_INFO2("Reader option 0x%02x", networkDevice[reader_index].options);
-		}
-		break;
-
-		case 3:
-		{
-			/* save device key */
-			snprintf(networkDevice[reader_index].key, 16, "%s", startfind);
-			DEBUG_INFO2("Reader key %s", networkDevice[reader_index].key);
-		}
-		break;
-		}
-		option_counter++;
-		startfind = dashPosition + 1;
-		dashPosition = strchr(startfind, ':');
+		DEBUG_INFO1("Invalid network device name");
+		return STATUS_UNSUCCESSFUL;
 	}
 
 	networkDevice[reader_index].status = NOT_CONNECTED;
@@ -746,7 +890,8 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
 		networkDevice[reader_index].ccid.dwMaxIFSD = dw2i(configuration_descriptor, 28);
 		networkDevice[reader_index].ccid.dwDefaultClock = dw2i(configuration_descriptor, 10);
 		networkDevice[reader_index].ccid.dwMaxDataRate = dw2i(configuration_descriptor, 23);
-		networkDevice[reader_index].ccid.bMaxSlotIndex = configuration_descriptor[4];
+		DEBUG_INFO2("Reader reports %d slot(s)", configuration_descriptor[4] + 1);
+		networkDevice[reader_index].ccid.bMaxSlotIndex = (unsigned char)(networkDevice[reader_index].configured_slots - 1);
 		networkDevice[reader_index].ccid.bCurrentSlotIndex = 0;
 		networkDevice[reader_index].ccid.readTimeout = DEFAULT_COM_READ_TIMEOUT;
 
@@ -764,7 +909,7 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
 		 * bbbb = build number). */
 		networkDevice[reader_index].ccid.IFD_bcdDevice = device_descriptor[13] << 24 | device_descriptor[12] << 16;
 
-		networkDevice[reader_index].real_nb_opened_slots = (int)(networkDevice[reader_index].ccid.bMaxSlotIndex) + 1;
+		networkDevice[reader_index].real_nb_opened_slots = (int)networkDevice[reader_index].configured_slots;
 		networkDevice[reader_index].nb_opened_slots = &networkDevice[reader_index].real_nb_opened_slots;
 
 		DEBUG_INFO2("IFD_bcdDevice " DWORD_X "", (unsigned long)networkDevice[reader_index].ccid.IFD_bcdDevice);
