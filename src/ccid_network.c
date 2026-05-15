@@ -1160,6 +1160,34 @@ status_t CloseNetwork(unsigned int reader_index)
 			// wait for the thread to actually terminate
 			pthread_join(msExt->thread_proc, NULL);
 
+			if (networkDevice[reader_index].dev_handle != -1)
+			{
+				DEBUG_INFO1("Stop Configuration");
+				pthread_mutex_lock(&msExt->mutex_reader_access);
+				// request set configuration and start reader
+				SET_CONFIGURATION[6] = READER_OPTION_STOP;
+				SET_CONFIGURATION[10] = networkDevice[reader_index].options;
+				if (write(networkDevice[reader_index].dev_handle, SET_CONFIGURATION, sizeof(SET_CONFIGURATION)) > 0)
+				{
+					if (read(networkDevice[reader_index].dev_handle, working_buffer, DESC_SET_CFG_LEN) > 0)
+					{
+						if (working_buffer[10] != READER_OPTION_STOP)
+						{
+							DEBUG_INFO1("Unable to stop the reader (code)");
+						}
+					}
+					else
+					{
+						DEBUG_INFO1("Unable to stop the reader (read)");
+					}
+				}
+				else
+				{
+					DEBUG_INFO1("Unable to stop the reader (write)");
+				}
+				pthread_mutex_unlock(&msExt->mutex_reader_access);
+			}
+
 			// release the shared objects
 			pthread_cond_destroy(&msExt->condition);
 			pthread_mutex_destroy(&msExt->mutex);
@@ -1175,31 +1203,6 @@ status_t CloseNetwork(unsigned int reader_index)
 
 		if (networkDevice[reader_index].dev_handle != -1)
 		{
-
-			DEBUG_INFO1("Stop Configuration");
-			pthread_mutex_lock(&networkDevice[reader_index].multislot_extension->mutex_reader_access);
-			// request set configuration and start reader
-			SET_CONFIGURATION[6] = READER_OPTION_STOP;
-			SET_CONFIGURATION[10] = networkDevice[reader_index].options;
-			if (write(networkDevice[reader_index].dev_handle, SET_CONFIGURATION, sizeof(SET_CONFIGURATION)) > 0)
-			{
-				if (read(networkDevice[reader_index].dev_handle, working_buffer, DESC_SET_CFG_LEN) > 0)
-				{
-					if (working_buffer[10] != READER_OPTION_STOP)
-					{
-						DEBUG_INFO1("Unable to stop the reader (code)");
-					}
-				}
-				else
-				{
-					DEBUG_INFO1("Unable to stop the reader (read)");
-				}
-			}
-			else
-			{
-				DEBUG_INFO1("Unable to stop the reader (write)");
-			}
-			pthread_mutex_unlock(&networkDevice[reader_index].multislot_extension->mutex_reader_access);
 
 			shutdown(networkDevice[reader_index].dev_handle, 2);
 			DEBUG_INFO2("close socket %d", reader_index);
