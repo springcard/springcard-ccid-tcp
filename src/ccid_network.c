@@ -1299,12 +1299,7 @@ status_t CloseNetwork(unsigned int reader_index)
 		// If this is a multislot reader, close using the multislot stuff
 		if (msExt)
 		{
-			// terminate the interrupt waiter thread
-			Multi_PollingTerminate(msExt);
-
-			// wait for the thread to actually terminate
-			pthread_join(msExt->thread_proc, NULL);
-
+			msExt->terminated = TRUE;
 			if (networkDevice[reader_index].dev_handle != -1)
 			{
 				DEBUG_INFO1("Stop Configuration");
@@ -1332,6 +1327,12 @@ status_t CloseNetwork(unsigned int reader_index)
 				}
 				pthread_mutex_unlock(&msExt->mutex_reader_access);
 			}
+
+			// terminate the interrupt waiter thread
+			Multi_PollingTerminate(msExt);
+
+			// wait for the thread to actually terminate
+			pthread_join(msExt->thread_proc, NULL);
 
 			// release the shared objects
 			pthread_cond_destroy(&msExt->condition);
@@ -1444,6 +1445,10 @@ static void *Multi_PollingProc(void *p_ext)
 			read_wait_timeout.tv_sec = 10;
 			read_wait_timeout.tv_usec = 0;
 			rv = select(networkDevice[msExt->reader_index].dev_handle + 1, &fds, NULL, NULL, &read_wait_timeout);
+			if (msExt->terminated)
+			{
+				break;
+			}
 			if (rv == -1)
 			{
 				DEBUG_CRITICAL("select error, force try connection");
@@ -1462,9 +1467,17 @@ static void *Multi_PollingProc(void *p_ext)
 			}
 
 		read_again:
+			if (msExt->terminated)
+			{
+				break;
+			}
 			rv = read(networkDevice[msExt->reader_index].dev_handle, &receive_buffer[offset], (1024 - offset));
 			if (rv < 0)
 			{
+				if (msExt->terminated)
+				{
+					break;
+				}
 #ifndef _NO_AUTO_STATUS				
 				//DEBUG_CRITICAL4("%s read error %d (%s)", networkDevice[msExt->reader_index].reader_ip, errno, strerror(errno));
 				/* check status only if no recv started */
@@ -1549,6 +1562,10 @@ static void *Multi_PollingProc(void *p_ext)
 			}
 			else if (rv == 0)
 			{
+				if (msExt->terminated)
+				{
+					break;
+				}
 				// DEBUG_INFO1( "STATUS_NO_DATA_TO_READ");
 				count_following_no_data++;
 				if (count_following_no_data > 10)
@@ -1764,6 +1781,10 @@ static void *Multi_PollingProc(void *p_ext)
 		else
 		{
 		read_error:
+			if (msExt->terminated)
+			{
+				break;
+			}
 
 			DEBUG_INFO1("Check Connection -> STATUS_NO_SUCH_DEVICE");
 			disable_driver();
@@ -1840,10 +1861,17 @@ RESPONSECODE CmdNetworkGetSlotStatus(unsigned int reader_index, unsigned char bu
  ****************************************************************************/
 static void Multi_PollingTerminate(struct networkDevice_MultiSlot_Extension *msExt)
 {
-	if (msExt && !msExt->terminated)
+	if (msExt)
 	{
-		msExt->terminated = TRUE;
+		if (!msExt->terminated)
+		{
+			msExt->terminated = TRUE;
+		}
 		DEBUG_INFO2("(%s)", networkDevice[msExt->reader_index].reader_ip);
+		if (networkDevice[msExt->reader_index].dev_handle != -1)
+		{
+			shutdown(networkDevice[msExt->reader_index].dev_handle, 2);
+		}
 	}
 } /* Multi_PollingTerminate */
 
