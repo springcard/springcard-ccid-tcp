@@ -805,7 +805,7 @@ status_t WriteNetwork(unsigned int reader_index, unsigned int length, unsigned c
 
 	if ( networkDevice[reader_index].multislot_extension == NULL )
 	{
-		DEBUG_CRITICAL3("WriteNetwork %d %d", reader_index, networkDevice[reader_index].multislot_extension->reader_id);
+		DEBUG_CRITICAL2("WriteNetwork: no multislot_extension for reader %u", reader_index);
 		disable_driver();
 		return STATUS_NO_SUCH_DEVICE;
 	}
