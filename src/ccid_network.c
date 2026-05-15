@@ -1032,13 +1032,13 @@ status_t ReadNetwork(unsigned int reader_index, unsigned int *length, unsigned c
 	
 
 	msExt = networkDevice[reader_index].multislot_extension;
-	pthread_mutex_unlock(&networkDevice[reader_index].multislot_extension->mutex_reader_access);
 	if (msExt == NULL)
 	{
 		DEBUG_INFO1("Interrupt thread is OFF !!!");
 		disable_driver();
 		return STATUS_NO_SUCH_DEVICE;
 	}
+	pthread_mutex_unlock(&msExt->mutex_reader_access);
 
 	if (networkDevice[reader_index].status != CONNECTED)
 	{
