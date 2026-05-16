@@ -1,87 +1,118 @@
-USB CCID IFD Handler
-====================
+SpringCard CCID TCP IFD Handler
+===============================
 
-This package provides the source code for a SpringCard Network CCID (Chip/Smart
-Card Interface Devices) and ICCD (Integrated Circuit(s) Card Devices)
-driver. See the USB CCID [1] and ICCD [2] specifications from the USB
-working group.
+This package provides the source code for a SpringCard TCP CCID IFD Handler for
+pcsc-lite.
 
-[1] http://www.usb.org/developers/devclass_docs/DWG_Smart-Card_CCID_Rev110.pdf
-[2] http://www.usb.org/developers/devclass_docs/DWG_Smart-Card_USB-ICC_ICCD_rev10.pdf
+It is not a USB CCID IFD Handler. The supported readers expose a CCID-compatible
+smart-card interface, so the upper PC/SC and CCID command handling remains close
+to a USB CCID driver, but the transport is network-based and is very different
+from USB hotplug.
 
-Authors of CCID (based library):
-================================
+The driver is derived from Ludovic Rousseau's CCID driver. SpringCard removed
+the USB and serial reader management from that code base and added the network
+transport used by SpringCard readers.
+
+
+Authors of the original CCID-based library:
+===========================================
 
 - Ludovic Rousseau <ludovic.rousseau@free.fr>
-- Carlos Prados for the PPS and ATR parsing code (taken from his
-  towitoto driver) in towitoko/ directory.
-- Olaf Kirch for the T=1 TPDU code (from the OpenCT package) in openct/
-  directory. I (Ludovic Rousseau) greatly improved this code.
-  
-Authors of SPRINGCARDTCPCCID :
-================================
+- Carlos Prados for the PPS and ATR parsing code, taken from his towitoko
+  driver in the towitoko/ directory.
+- Olaf Kirch for the T=1 TPDU code, from the OpenCT package in the openct/
+  directory.
+
+
+Authors of SpringCard CCID TCP:
+===============================
+
 - Matthieu Barreteau <support@springcard.com>
 - Sylvain ALBERT <support@springcard.com>
 
-CCID and ICCD readers:
-======================
 
-A reader can be in one of these list:
-- supported
-    SpringCard Ethernet Reader
+Supported readers:
+==================
+
+This driver is intended for SpringCard network readers and modules that support
+CCID over TCP, including:
+
+- E663 module
+- SpringPark-SD
+- TwistyWriter-IP
+- E519 module
+- SpringPark EVO
+
+The reader must be reachable from the host running pcscd, and the pcsc-lite
+reader configuration must point to the reader IP address and TCP port.
 
 
 Supported operating systems:
 ============================
 
-- GNU/Linux (libusb 1.0)
-- MacOS X/Darwin (libusb 1.0)
+The driver targets Unix-like systems supported by pcsc-lite. It has primarily
+been used on GNU/Linux systems.
 
-See also http://pcsclite.alioth.debian.org/ccid.html for more
-information.
-
-
-Debug informations:
-===================
-
-The driver uses the debug function provided by pcscd. So if pcscd sends
-its debug to stdout (pcscd --foreground) then the CCID driver will also
-send its debug to stdout. If pcscd sends its debug to syslog (by
-default) then the CCID driver will also send its debug to syslog.
-
-You can change the debug level using the Info.plist configuration file.
-The Info.plist is installed, by default, in
-/usr/local/pcsc/drivers/ifd-ccid.bundle/Contents/Info.plist
-or set the environment variable LIBCCID_ifdLogLevel.
-
-The debug level is set in the ifdLogLevel field. It is a binary OR
-combinaison of 4 different levels.
-- 1: critical: important error messages
-- 2: info:     informative messages like what reader was detected
-- 4: comm:     a dump of all the bytes exchanged between the host and the
-               reader
-- 8: periodic: periodic info when pcscd test if a card is present (every
-               1/10 of a second)
-
-By default the debug level is set to 3 (1 + 2) and correspond to the
-critical and info levels.
-
-You have to restart the driver so it read the configuration file again
-and use the new debug level value.  To restart the driver you just need
-to unplug all your CCID readers so the the driver is unloaded and then
-replug your readers. You can also restart pcscd.
+macOS/Darwin support may require platform-specific packaging and validation.
 
 
-Driver installation
+Installation:
+=============
+
+See INSTALL for build, installation, pcsc-lite configuration and test
+instructions.
+
+
+Runtime behavior:
 =================
 
-You have to restart the driver so it read the configuration file again
-and use the new debug level value.  To restart the driver you just need
-to unplug all your CCID readers so the the driver is unloaded and then
-replug your readers.  You can also restart pcscd.
+The driver is loaded by pcscd through the pcsc-lite IFD Handler mechanism. Each
+network reader is declared in the pcsc-lite reader configuration, typically
+/etc/reader.conf or the directory returned by:
+
+    pkg-config libpcsclite --variable=serialconfdir
+
+The DEVICENAME field contains the network endpoint and connection options. See
+INSTALL for examples.
 
 
-Licence:
+Debug information:
+==================
+
+The driver uses the debug facility provided by pcscd. If pcscd logs to stdout
+for a foreground debug session, the driver logs there as well. If pcscd logs to
+syslog or the system journal, the driver follows that behavior.
+
+The debug level may be set with the LIBCCID_ifdLogLevel environment variable
+before starting pcscd. It is a bit mask:
+
+- 1: critical errors
+- 2: informational messages
+- 4: communication dumps
+- 8: periodic card-presence checks
+
+The default level is 3, which enables critical and informational messages.
+Restart pcscd after changing the environment or configuration used by the
+driver.
+
+
+Reader availability hook:
+=========================
+
+The installation includes a hook script named springcard-ccid-tcp-hook. The
+driver calls this script asynchronously when a configured reader becomes
+available or unavailable.
+
+This hook is intended for sites where the network can be unreliable, such as
+indoor or outdoor parking facilities. Integrators can use it to notify a
+monitoring tool, alert an operator or trigger controlled recovery actions, for
+example power-cycling network equipment through a supervised system.
+
+The hook must remain small, secure and non-blocking from an operational point of
+view. See INSTALL for its location, arguments and execution constraints.
+
+
+License:
 ========
 
   This library is free software; you can redistribute it and/or modify it
@@ -91,7 +122,7 @@ your option) any later version.
 
   This library is distributed in the hope that it will be useful, but
 WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser
 General Public License for more details.
 
   You should have received a copy of the GNU Lesser General Public License
@@ -104,23 +135,25 @@ History:
 
 1.4.18 - 09 March 2016, Sylvain ALBERT
     - First public release
-      . The library is a copy of the CCID library from Lucovic Rousseau.
+      . The library is derived from Ludovic Rousseau's CCID library.
       . Remove USB and TwinSerie management.
-      . Add Network management for SpringCard Readers.   
-      
+      . Add network management for SpringCard readers.
+
 1.4.19 - 28 September 2016, Sylvain ALBERT
     - Second public release
       . No read after select fails.
-      . Trace the unsupported message command       
-      
+      . Trace the unsupported message command.
+
 1.4.19 - 16 November 2016, Sylvain ALBERT
     - Third public release
-      . CmdNetworkGetSlotStatus modified. Change buffer[7] by reader_index. buffer[7] should be the slot index but not the case on armbian.
+      . CmdNetworkGetSlotStatus modified. Change buffer[7] by reader_index.
+        buffer[7] should be the slot index but not the case on armbian.
 
 1.4.20 - 14 January 2021, Sylvain ALBERT
     - Fourth public release
       . Commit from Vincent Jardin.
-      . Fill IFD_bcdDevice, sIFD_iManufacturer, sIFD_serial_number from reader settings.
+      . Fill IFD_bcdDevice, sIFD_iManufacturer, sIFD_serial_number from reader
+        settings.
 
 1.4.21 - 20 June 2022, Sylvain ALBERT
     - Public release
@@ -131,7 +164,7 @@ History:
 1.4.22 - 05 March 2025, Sylvain ALBERT
     - Public release
       . Improve basic multislot management for SpringPark.
-      . Correct Bug connect/deconnect reader.
+      . Correct bug connect/disconnect reader.
 
 1.4.23 - 23 September 2025, Sylvain ALBERT
     - Public release

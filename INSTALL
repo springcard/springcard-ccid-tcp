@@ -1,92 +1,212 @@
 INSTALLATION PROCEDURE
 ======================
 
+This document explains how to build, install and configure the SpringCard CCID
+TCP IFD Handler for pcsc-lite.
+
+This is a network driver for SpringCard readers. It is not the USB CCID driver,
+and it does not use USB device discovery.
+
+
 Installation from source:
 """""""""""""""""""""""""
 
-get the ccid-x.y.z.tar.gz archive and do:
+From a release archive:
 
-$ tar xzvf springcardtcpccid-x.y.z.tar.gz
-$ cd springcardtcpccid-x.y.z
-$ ./configure
-$ make
-$ sudo make install
+    $ tar xzvf springcard_ccid_tcp-x.y.z.tar.gz
+    $ cd springcard_ccid_tcp-x.y.z
+    $ ./configure
+    $ make
+    $ sudo make install
 
-By default pcscd and my ccid driver use /usr/local/pcsc/drivers/ as
-directory for hotplug drivers. The ./configure script try to get the
-directory used by pcscd using 'pkg-config libpcsclite --variable=usbdropdir'
-So you should not have to use the --enable-usbdropdir=DIR argument.
+From a checkout, run the project bootstrap step first if configure has not yet
+been generated:
 
-Note
-~~~~
-This package is derivated from the CCID package from Ludovic Rousseau.
-We disable USB and TwinSerie and add Network management for SpringCard PC/SC Reader.
-We have made minor changes inside the def.h and ifdhandler.c file.(See _NETWORK).
+    $ ./bootstrap
+    $ ./configure
+    $ make
+    $ sudo make install
 
-libusb not found
-~~~~~~~~~~~~~~~~
+The configure script obtains pcsc-lite paths with pkg-config. The main driver
+bundle is installed below the pcsc-lite drop directory returned by:
 
-If the ./configure script says something like:
-  configure: error: usb.h not found, use --enable-libusb=PATH
-You should use --enable-libusb=PATH to tell ./configure where to find
-the usb.h and libusb.so files. The ./configure script will use
-PATH/include/ to search for usb.h and PATH/lib/ to search for libusb.so
+    $ pkg-config libpcsclite --variable=usbdropdir
+
+With the default bundle name, the installed driver directory is:
+
+    $(pkg-config libpcsclite --variable=usbdropdir)/ifd-springcard-ccid-tcp.bundle
+
+The installed shared library can be found with:
+
+    $ find "$(pkg-config libpcsclite --variable=usbdropdir)" \
+        -path "*/ifd-springcard-ccid-tcp.bundle/Contents/*/libspringcard_ccid_tcp.*" \
+        -print
+
+If your system uses non-standard pcsc-lite paths, pass them explicitly to
+configure. The most common option is:
+
+    $ ./configure --enable-usbdropdir=/path/to/pcsc/drivers
+
+The option name is inherited from pcsc-lite/CCID conventions. In this project it
+selects the pcsc-lite IFD Handler drop directory; it does not mean that the
+driver uses USB.
 
 
-configuring the driver for the network reader
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Dependencies:
+"""""""""""""
 
-You have to create or edit the file /etc/reader.conf. The file should
-contain something like:
+Build dependencies include:
 
-#FRIENDLYNAME      "SpringCard Reader Name"
-#DEVICENAME        www.xxx.yyy.zzz:port:option:key
-#LIBPATH           TARGET
-#CHANNELID         1
+- a C compiler and standard build tools
+- autoconf/automake/libtool when building from a checkout
+- pkg-config
+- pcsc-lite development headers and library
+- POSIX threads
+- libusb development files, unless configured out with --disable-libusb
 
-FRIENDLYNAME      "E663"
-DEVICENAME        192.168.17.100:3999:00:nokey
-LIBPATH           /usr/local/lib/pcsc/drivers/ethernet/libspringcardtcpccid.so.1.2.3
+Some libusb checks are still present because this project is derived from the
+CCID driver build system. The runtime transport used by this driver is TCP.
 
-You will have to adapt the library path to your configuration and library
-version.
 
-Binary installation:
-""""""""""""""""""""
+Configuring network readers:
+""""""""""""""""""""""""""""
 
-Contact your distribution support.
+Declare each network reader in the pcsc-lite reader configuration. Depending on
+the distribution, this is usually /etc/reader.conf or a file under the
+directory returned by:
+
+    $ pkg-config libpcsclite --variable=serialconfdir
+
+A typical entry is:
+
+    FRIENDLYNAME      "E663"
+    DEVICENAME        192.168.17.100:3999:00:nokey
+    LIBPATH           /usr/local/pcsc/drivers/ifd-springcard-ccid-tcp.bundle/Contents/Linux/libspringcard_ccid_tcp.so
+    CHANNELID         1
+
+Adapt the IP address, TCP port and LIBPATH to your installation. Use the find
+command above to get the exact installed library path.
+
+DEVICENAME format:
+
+    host:port:option:key
+
+This legacy positional syntax is still supported. The fields are:
+
+- host: reader host name or IPv4 address
+- port: reader TCP port, from 1 to 65535
+- option: reader option byte, from 0 to 255; decimal and 0x-prefixed
+  hexadecimal values are accepted
+- key: reader key string, for example nokey when no key is used
+
+Legacy example:
+
+    192.168.17.100:3999:00:nokey
+
+The newer optional named syntax is:
+
+    host=<host>:port=<port>:options=<options>:key=<key>:slots=<slots>
+
+Named fields may be omitted when the default value is suitable:
+
+- port defaults to 3999
+- options defaults to 0x00
+- key defaults to an empty string
+- slots defaults to 1 and may be set from 1 to 4
+
+The host is mandatory. In named mode, it may be written either as host=<host> or
+as the first unnamed token:
+
+    host=192.168.17.100:port=3999:options=0x00:key=nokey:slots=1
+    192.168.17.100:slots=4
+
+After changing reader.conf, restart pcscd.
+
+
+Finding the availability hook:
+""""""""""""""""""""""""""""""
+
+The hook script is installed in the driver bundle. Locate it with:
+
+    $ find "$(pkg-config libpcsclite --variable=usbdropdir)" \
+        -path "*/ifd-springcard-ccid-tcp.bundle/Contents/Resources/springcard-ccid-tcp-hook" \
+        -print
+
+With default paths, it is usually:
+
+    $(pkg-config libpcsclite --variable=usbdropdir)/ifd-springcard-ccid-tcp.bundle/Contents/Resources/springcard-ccid-tcp-hook
+
+The driver calls the hook with two arguments:
+
+    springcard-ccid-tcp-hook "<reader name>" available
+    springcard-ccid-tcp-hook "<reader name>" unavailable
+
+The hook is optional. If it is not executable, the driver silently skips it.
+
+
+Hook constraints:
+"""""""""""""""""
+
+The hook runs from the pcscd/driver context and must be treated as privileged
+operational code.
+
+Security requirements:
+
+- keep the script owned and writable only by a trusted administrator
+- do not use untrusted input to build shell commands
+- quote all arguments
+- use absolute paths for called programs when possible
+- keep PATH assumptions minimal
+- avoid storing secrets directly in the script
+
+Runtime requirements:
+
+- return quickly; the driver enforces a 5 second timeout
+- do not perform long network operations directly
+- hand off slow work to a supervised service, queue or monitoring agent
+- do not write to stdout or stderr for normal operation; they are redirected to
+  /dev/null by the driver
+- make the script idempotent because reader availability may change repeatedly
+
+Typical uses include notifying a monitoring system, logging reader state changes
+or asking a supervised controller to restart external network equipment at
+sites where connectivity is unreliable.
 
 
 Test procedure:
 """""""""""""""
 
-- check the reader is supported by the driver.
-  Get your reader USB identification using the lsusb(1) command:
-  $ lsusb
-  [...]
-  Bus 001 Device 048: ID 08e6:4433 Gemplus
+1. Confirm that the reader is powered, configured and reachable over the
+   network:
 
-  Look for 08E6 (ifdVendorID) and 4433 (ifdProductID) in
-  /usr/local/pcsc/drivers/ifd-ccid.bundle/Contents/Info.plist
-  Of course your numbers will be different.
+       $ ping 192.168.17.100
+       $ nc -vz 192.168.17.100 3999
 
-  If you can't find them add them (if you know what you do) and/or mail me.
+2. Confirm that reader.conf points to the installed driver library:
 
-- (re)start pcscd with debug on stdout. Simply do 'pcscd --debug stdout'
-  (you will need to have root priviledges). And look for:
-  [...]
-  readerfactory.c:1319 RFInitializeReader: Attempting startup of ReaderName
-  readerfactory.c:1061 RFBindFunctions: Loading IFD Handler 2.0
-  ifdhandler.c:76 Entering IFDHCreateChannel (lun: 0)
-  ccid_usb.c:131 Manufacturer: Ludovic Rousseau (ludovic.rousseau@free.fr)
-  ccid_usb.c:139 ProductString: Generic CCID reader v0.1.0
-  ccid_usb.c:143 Copyright: This driver is protected by terms of the GNU General Public License version 2, or (at your option) any later version.
-  ccid_usb.c:223 Found Vendor/Product: 08E6/4433 (GemPC433 SL)
-  ccid_usb.c:224 Using USB bus/device: 001/047
+       $ find "$(pkg-config libpcsclite --variable=usbdropdir)" \
+           -path "*/ifd-springcard-ccid-tcp.bundle/Contents/*/libspringcard_ccid_tcp.*" \
+           -print
 
-  If you don't see this the driver is not installed correctly or your
-  reader is not yet supported. Read
-  http://pcsclite.alioth.debian.org/ccid.html#CCID_compliant to know
-  what to do.
+3. Restart pcscd. The exact command depends on the system:
 
-$Id: INSTALL 4814 2010-03-12 15:42:07Z rousseau $
+       $ sudo systemctl restart pcscd
+
+   or run pcscd in foreground debug mode during integration:
+
+       $ sudo pcscd --foreground --debug
+
+4. Use pcsc_scan or your PC/SC application to verify that the configured reader
+   appears and that card insertion/removal is reported.
+
+
+Troubleshooting:
+""""""""""""""""
+
+- If the reader does not appear, check reader.conf syntax, LIBPATH, the reader
+  IP address, TCP port and local firewall rules.
+- If pcscd cannot load the driver, verify that the installed shared library path
+  matches LIBPATH and that file permissions allow pcscd to read and execute it.
+- If the hook is not called, verify that it exists and is executable.
+- If pcscd logs show hook timeouts, move the slow work out of the hook and into
+  a background service or monitoring system.
