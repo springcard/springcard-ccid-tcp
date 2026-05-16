@@ -13,6 +13,8 @@ COMMON = ccid.c \
 	commands.h \
 	debug.h \
 	defs.h \
+	hook.c \
+	hook.h \
 	ifdhandler.c \
 	utils.c \
 	utils.h
@@ -63,6 +65,7 @@ libspringcard_ccid_tcp_la_LDFLAGS = -avoid-version
 #parse_CFLAGS = $(PCSC_CFLAGS) $(LIBUSB_CFLAGS) -DSIMCLIST_NO_DUMPRESTORE
 
 EXTRA_DIST = Info.plist.src create_Info_plist.pl reader.conf.in \
+	springcard-ccid-tcp-hook \
 	towitoko/COPYING towitoko/README openct/LICENSE \
 	convert_version.pl 92_pcscd_springcardccidtcp.rules
 
@@ -79,8 +82,10 @@ DISTCLEANFILES = tokenparser.c Info.plist
 
 install: libspringcard_ccid_tcp.la Info.plist
 	$(mkinstalldirs) $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/$(BUNDLE_HOST)/
+	$(mkinstalldirs) $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/Resources/
 	cp Info.plist $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/
 	cp .libs/$(CCID_LIB) $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/$(BUNDLE_HOST)/$(CCID_LIB)
+	$(INSTALL_SCRIPT) $(srcdir)/springcard-ccid-tcp-hook $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/Resources/springcard-ccid-tcp-hook
 #	$(INSTALL_UDEV_RULE_FILE)
 
 

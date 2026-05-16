@@ -71,6 +71,7 @@ AC_SUBST(LIBTOOL_DEPS)
 AC_HEADER_STDC
 AC_CHECK_HEADERS(errno.h fcntl.h stdlib.h unistd.h termios.h string.h sys/time.h sys/types.h stdarg.h arpa/inet.h stdio.h,,
 	[AC_MSG_ERROR([some header files not found])])
+AC_CHECK_HEADERS(sys/wait.h signal.h spawn.h)
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -78,7 +79,7 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 
 # Checks for library functions.
-AC_CHECK_FUNCS(select strerror strncpy memcpy strlcpy strlcat)
+AC_CHECK_FUNCS(select strerror strncpy memcpy strlcpy strlcat access kill waitpid posix_spawn)
 
 # Select OS specific versions of source files.
 AC_SUBST(BUNDLE_HOST)
@@ -200,6 +201,10 @@ if test "${ccidethernetdir}" = false ; then
 	ccidethernetdir=$usbdropdir/ethernet
 fi
 
+hookscript="$usbdropdir/$bundle/Contents/Resources/springcard-ccid-tcp-hook"
+AC_DEFINE_UNQUOTED(HOOK_SCRIPT_PATH, "$hookscript", [reader availability hook script])
+AC_SUBST(hookscript)
+
 # --enable-ethernetconfdir=DIR
 AC_ARG_ENABLE(ethernetconfdir,
 	AS_HELP_STRING([--enable-ethernetconfdir=dir],[directory containing
@@ -293,6 +298,7 @@ bundle directory name:   ${bundle}
 USB drop directory:      ${usbdropdir}
 ethernet install dir: 	${ccidethernetdir}
 ethernet config directory: ${ethernetconfdir}
+hook script:             ${hookscript}
 compiled for pcsc-lite:  ${pcsclite}
 class driver:            ${class}
 

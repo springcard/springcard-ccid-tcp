@@ -48,6 +48,7 @@
 #include "ccid.h"
 #include "debug.h"
 #include "defs.h"
+#include "hook.h"
 #include "utils.h"
 #include "parser.h"
 #include "ccid_ifdhandler.h"
@@ -217,6 +218,7 @@ static status_t ParseNetworkDeviceName(unsigned int reader_index, /*@null@*/ con
 static void NetworkInitDefaultDescriptor(unsigned int reader_index);
 static status_t NetworkLoadReaderDescriptor(unsigned int reader_index);
 static void NetworkMarkReaderAbsent(unsigned int reader_index, status_t status);
+static void NetworkNotifyReaderState(unsigned int reader_index, const char *state);
 static void NetworkClearPendingReadSignal(struct networkDevice_MultiSlot_Extension *msExt);
 static void NetworkWakePendingReads(struct networkDevice_MultiSlot_Extension *msExt, status_t status);
 
@@ -454,6 +456,8 @@ static RESPONSECODE connectToReader(unsigned int reader_index)
  ****************************************************************************/
 static RESPONSECODE tryConnection(unsigned int reader_index)
 {
+	int was_connected = (networkDevice[reader_index].status == CONNECTED);
+
 	if (networkDevice[reader_index].dev_handle != -1)
 	{
 		close(networkDevice[reader_index].dev_handle);
@@ -471,6 +475,8 @@ static RESPONSECODE tryConnection(unsigned int reader_index)
 
 		networkDevice[reader_index].status = CONNECTED;
 		NetworkClearPendingReadSignal(networkDevice[reader_index].multislot_extension);
+		if (!was_connected)
+			NetworkNotifyReaderState(reader_index, "available");
 		return IFD_SUCCESS;
 	}
 
@@ -725,6 +731,7 @@ static void NetworkMarkReaderAbsent(unsigned int reader_index, status_t status)
 	struct networkDevice_MultiSlot_Extension *msExt = networkDevice[reader_index].multislot_extension;
 	unsigned int idx;
 	CcidDesc *ccid_slot;
+	int was_connected = (networkDevice[reader_index].status == CONNECTED);
 
 	if (networkDevice[reader_index].dev_handle != -1)
 	{
@@ -735,6 +742,8 @@ static void NetworkMarkReaderAbsent(unsigned int reader_index, status_t status)
 
 	networkDevice[reader_index].status = NOT_CONNECTED;
 	networkDevice[reader_index].ccid.dwSlotStatus = IFD_ICC_NOT_PRESENT;
+	if (was_connected)
+		NetworkNotifyReaderState(reader_index, "unavailable");
 
 	if (msExt != NULL)
 	{
@@ -754,6 +763,20 @@ static void NetworkMarkReaderAbsent(unsigned int reader_index, status_t status)
 		*ccid_slot->pcATRBuffer = '\0';
 		ccid_slot->bPowerFlags = POWERFLAGS_RAZ;
 	}
+}
+
+static void NetworkNotifyReaderState(unsigned int reader_index, const char *state)
+{
+	CcidDesc *ccid_slot = get_ccid_slot(reader_index);
+	const char *reader_name = NULL;
+
+	if (ccid_slot != NULL)
+		reader_name = ccid_slot->readerName;
+
+	if ((reader_name == NULL) || (*reader_name == '\0'))
+		reader_name = networkDevice[reader_index].reader_ip;
+
+	ReaderHookNotifyState(reader_name, state);
 }
 
 static status_t NetworkLoadReaderDescriptor(unsigned int reader_index)
@@ -1276,8 +1299,12 @@ status_t CloseNetwork(unsigned int reader_index)
 		(0 == *networkDevice[reader_index].nb_opened_slots))
 	{
 		struct networkDevice_MultiSlot_Extension *msExt = NULL;
+		int was_connected = (networkDevice[reader_index].status == CONNECTED);
 
 		DEBUG_COMM("Last slot closed. Release resources");
+		if (was_connected)
+			NetworkNotifyReaderState(reader_index, "unavailable");
+		networkDevice[reader_index].status = NOT_CONNECTED;
 
 		msExt = networkDevice[reader_index].multislot_extension;
 		// If this is a multislot reader, close using the multislot stuff
@@ -1484,25 +1511,7 @@ static void *Multi_PollingProc(void *p_ext)
 										rv, strerror(errno), errno);
 
 						DEBUG_INFO1("STATUS_NO_SUCH_DEVICE");
-						networkDevice[msExt->reader_index].status = NOT_CONNECTED;
-						for ( int idx = 0; idx < SPRINGCARD_MAX_SLOT; idx++)
-						{
-							networkDevice[msExt->reader_index].multislot_extension->card_status[idx] = CCID_ICC_ABSENT;
-						}
-
-						/* Lock the mutex */
-						pthread_mutex_lock(&msExt->mutex);
-
-						/* Set the status and fill-in the interrupt buffer */
-						memset(msExt->buffer, 0x00, CCID_BUFFER_SIZE);
-						msExt->buffer_size = 0;
-						msExt->status = STATUS_NO_SUCH_DEVICE;
-
-						//msExt->signal_done = 1;
-						/* Broadcast the condition */
-						pthread_cond_broadcast(&msExt->condition);
-						/* readUnlock */
-						pthread_mutex_unlock(&msExt->mutex);
+						NetworkMarkReaderAbsent(msExt->reader_index, STATUS_NO_SUCH_DEVICE);
 						goto read_error;
 					}
 					else
@@ -1517,25 +1526,7 @@ static void *Multi_PollingProc(void *p_ext)
 											rv, strerror(errno), errno);
 
 							DEBUG_INFO1("STATUS_NO_SUCH_DEVICE");
-							networkDevice[msExt->reader_index].status = NOT_CONNECTED;
-							for ( int idx = 0; idx < SPRINGCARD_MAX_SLOT; idx++)
-							{
-								networkDevice[msExt->reader_index].multislot_extension->card_status[idx] = CCID_ICC_ABSENT;
-							}
-
-							/* Lock the mutex */
-							pthread_mutex_lock(&msExt->mutex);
-
-							/* Set the status and fill-in the interrupt buffer */
-							memset(msExt->buffer, 0x00, CCID_BUFFER_SIZE);
-							msExt->buffer_size = 0;
-							msExt->status = STATUS_NO_SUCH_DEVICE;
-							//msExt->signal_done = 1;
-							/* Broadcast the condition */
-							pthread_cond_broadcast(&msExt->condition);
-
-							/* readUnlock */
-							pthread_mutex_unlock(&msExt->mutex);
+							NetworkMarkReaderAbsent(msExt->reader_index, STATUS_NO_SUCH_DEVICE);
 							goto read_error;
 						}
 					}

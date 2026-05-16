@@ -1,0 +1,18 @@
+#!/bin/sh
+
+reader_name=$1
+state=$2
+
+case "$state" in
+	available)
+		:
+		;;
+	unavailable)
+		:
+		;;
+	*)
+		exit 1
+		;;
+esac
+
+exit 0
