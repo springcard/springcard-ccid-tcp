@@ -26,6 +26,8 @@ libtool
 ltmain.sh
 missing
 ylwrap
+m4/libtool.m4
+m4/lt*.m4
 readers/Makefile
 readers/Makefile.in
 src/Info.plist
