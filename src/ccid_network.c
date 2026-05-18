@@ -33,7 +33,6 @@
 #ifdef S_SPLINT_S
 #include <sys/types.h>
 #endif
-#include <libusb.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
@@ -1234,7 +1233,7 @@ wait_again:
 				else if (check_read > 2)
 				{
 					DEBUG_CRITICAL2("Timeout(%d) - Stop Ellapsed", networkDevice[reader_index].multislot_extension->reader_id);
-					status = LIBUSB_TRANSFER_TIMED_OUT;
+					status = IFD_COMMUNICATION_ERROR;
 				}
 				else
 				{

@@ -43,26 +43,13 @@ if WITHOUT_PCSC
 PROVIDED_BY_PCSC = debug.c
 endif
 
-#libspringcardccidtcp_la_SOURCES = $(COMMON) $(USB) $(ETHERNET) $(TOKEN_PARSER) $(PROVIDED_BY_PCSC) $(T1)
-#libspringcardccidtcp_la_LIBADD = $(LEXLIB) $(LIBUSB_LIBS) $(PTHREAD_LIBS)
-#libspringcardccidtcp_la_CFLAGS = $(PCSC_CFLAGS) $(LIBUSB_CFLAGS) $(PTHREAD_CFLAGS) \
-#	$(SYMBOL_VISIBILITY) -D$(CCID_VERSION) -DSIMCLIST_NO_DUMPRESTORE
-#libspringcardccidtcp_la_LDFLAGS = -avoid-version
-
-#parse_SOURCES = parse.c debug.c ccid_usb.c $(TOKEN_PARSER)
-#parse_LDADD = $(LIBUSB_LIBS)
-#parse_CFLAGS = $(PCSC_CFLAGS) $(LIBUSB_CFLAGS) -DSIMCLIST_NO_DUMPRESTORE
 lib_LTLIBRARIES = 
 lib_LTLIBRARIES += libspringcard_ccid_tcp.la
 libspringcard_ccid_tcp_la_SOURCES = $(COMMON) $(NETWORK) $(TOKEN_PARSER) $(PROVIDED_BY_PCSC) $(T1)
-libspringcard_ccid_tcp_la_LIBADD = $(LEXLIB) $(LIBUSB_LIBS) $(PTHREAD_LIBS)
-libspringcard_ccid_tcp_la_CFLAGS = $(PCSC_CFLAGS) $(LIBUSB_CFLAGS) $(PTHREAD_CFLAGS) \
+libspringcard_ccid_tcp_la_LIBADD = $(LEXLIB) $(PTHREAD_LIBS)
+libspringcard_ccid_tcp_la_CFLAGS = $(PCSC_CFLAGS) $(PTHREAD_CFLAGS) \
 	$(SYMBOL_VISIBILITY) -D$(CCID_VERSION) -DSIMCLIST_NO_DUMPRESTORE
 libspringcard_ccid_tcp_la_LDFLAGS = -avoid-version
-
-#parse_SOURCES = parse.c debug.c ccid_network.c $(TOKEN_PARSER)
-#parse_LDADD = $(LIBUSB_LIBS)
-#parse_CFLAGS = $(PCSC_CFLAGS) $(LIBUSB_CFLAGS) -DSIMCLIST_NO_DUMPRESTORE
 
 EXTRA_DIST = Info.plist.src create_Info_plist.pl reader.conf.in \
 	springcard-ccid-tcp-hook \
