@@ -36,6 +36,15 @@ With the default bundle name, the installed driver directory is:
 
     $(pkg-config libpcsclite --variable=usbdropdir)/ifd-springcard-ccid-tcp.bundle
 
+make install also installs an empty, commented reader configuration example in
+the pcsc-lite reader configuration directory returned by:
+
+    $ pkg-config libpcsclite --variable=serialconfdir
+
+The installed example is named:
+
+    springcard-ccid-tcp.conf
+
 The installed shared library can be found with:
 
     $ find "$(pkg-config libpcsclite --variable=usbdropdir)" \
@@ -50,6 +59,11 @@ configure. The most common option is:
 The option name is inherited from pcsc-lite/CCID conventions. In this project it
 selects the pcsc-lite IFD Handler drop directory; it does not mean that the
 driver uses USB.
+
+To override the directory where the commented reader configuration example is
+installed, use:
+
+    $ ./configure --enable-ethernetconfdir=/path/to/reader.conf.d
 
 
 Dependencies:
@@ -71,21 +85,38 @@ CCID driver build system. The runtime transport used by this driver is TCP.
 Configuring network readers:
 """"""""""""""""""""""""""""
 
-Declare each network reader in the pcsc-lite reader configuration. Depending on
-the distribution, this is usually /etc/reader.conf or a file under the
+Declare each network reader in a file under the pcsc-lite reader configuration
 directory returned by:
 
     $ pkg-config libpcsclite --variable=serialconfdir
+
+This is typically /etc/reader.conf.d. Current pcsc-lite systems use files in
+that directory for manually configured IFD Handlers; do not document or rely on
+editing the old global /etc/reader.conf file for new installations.
+
+make install creates the file:
+
+    $(pkg-config libpcsclite --variable=serialconfdir)/springcard-ccid-tcp.conf
+
+It is intentionally empty from pcscd's point of view because every sample line
+is commented. Edit this file, uncomment one reader block and adapt it to your
+site.
 
 A typical entry is:
 
     FRIENDLYNAME      "E663"
     DEVICENAME        192.168.17.100:3999:00:nokey
     LIBPATH           /usr/local/pcsc/drivers/ifd-springcard-ccid-tcp.bundle/Contents/Linux/libspringcard_ccid_tcp.so
-    CHANNELID         1
+    CHANNELID         0
 
-Adapt the IP address, TCP port and LIBPATH to your installation. Use the find
-command above to get the exact installed library path.
+Adapt the IP address, TCP port and LIBPATH to your installation. The generated
+springcard-ccid-tcp.conf example already contains the LIBPATH selected by
+configure. You may also use the find command above to get the exact installed
+library path.
+
+CHANNELID is kept in the example for compatibility with pcsc-lite's
+reader.conf syntax, but recent IFD Handler 3.0 drivers use DEVICENAME to pass
+the actual endpoint to the driver.
 
 DEVICENAME format:
 
@@ -120,7 +151,13 @@ as the first unnamed token:
     host=192.168.17.100:port=3999:options=0x00:key=nokey:slots=1
     192.168.17.100:slots=4
 
-After changing reader.conf, restart pcscd.
+After changing the reader configuration file, restart pcscd.
+
+Important for pcsc-lite 2.2.0 and later: upstream pcsc-lite now uses Meson, and
+its serial reader support is disabled by default unless pcsc-lite is configured
+with -Dserial=true. Distribution packages may enable it for you. If pcscd does
+not parse the serialconfdir directory, this driver will install correctly but no
+network reader will be created.
 
 
 Finding the availability hook:
@@ -182,7 +219,8 @@ Test procedure:
        $ ping 192.168.17.100
        $ nc -vz 192.168.17.100 3999
 
-2. Confirm that reader.conf points to the installed driver library:
+2. Confirm that the reader configuration file points to the installed driver
+   library:
 
        $ find "$(pkg-config libpcsclite --variable=usbdropdir)" \
            -path "*/ifd-springcard-ccid-tcp.bundle/Contents/*/libspringcard_ccid_tcp.*" \
@@ -203,8 +241,10 @@ Test procedure:
 Troubleshooting:
 """"""""""""""""
 
-- If the reader does not appear, check reader.conf syntax, LIBPATH, the reader
-  IP address, TCP port and local firewall rules.
+- If the reader does not appear, check reader configuration syntax, LIBPATH,
+  the reader IP address, TCP port and local firewall rules.
+- If pcscd never reads the configuration directory, verify that your pcsc-lite
+  build/package has serial reader configuration support enabled.
 - If pcscd cannot load the driver, verify that the installed shared library path
   matches LIBPATH and that file permissions allow pcscd to read and execute it.
 - If the hook is not called, verify that it exists and is executable.

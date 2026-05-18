@@ -67,13 +67,24 @@ Runtime behavior:
 =================
 
 The driver is loaded by pcscd through the pcsc-lite IFD Handler mechanism. Each
-network reader is declared in the pcsc-lite reader configuration, typically
-/etc/reader.conf or the directory returned by:
+network reader is declared in a pcsc-lite reader configuration file. Current
+pcsc-lite installations use the configuration directory returned by:
 
     pkg-config libpcsclite --variable=serialconfdir
 
-The DEVICENAME field contains the network endpoint and connection options. See
-INSTALL for examples.
+This is typically /etc/reader.conf.d. The legacy single /etc/reader.conf file
+is not the preferred location on current systems.
+
+The DEVICENAME field contains the network endpoint and connection options.
+make install installs an empty, commented example named
+springcard-ccid-tcp.conf in that directory. Edit it, uncomment one block per
+reader and restart pcscd. See INSTALL for examples.
+
+Note: since pcsc-lite 2.2.0, upstream's Meson build disables serial reader
+configuration support by default unless pcsc-lite is configured with
+-Dserial=true. Distribution packages commonly choose their own defaults. This
+driver needs pcscd to read serialconfdir-style configuration files because the
+network readers are not discovered as USB devices.
 
 
 Debug information:

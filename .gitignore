@@ -32,6 +32,7 @@ m4/lt*.m4
 readers/Makefile
 readers/Makefile.in
 src/Info.plist
+src/springcard-ccid-tcp.conf
 src/Makefile
 src/Makefile.in
 src/tokenparser.c

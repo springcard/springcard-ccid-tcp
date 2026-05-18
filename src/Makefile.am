@@ -2,6 +2,7 @@
 
 CCID_BUNDLE = $(bundle)
 CCID_LIB = libspringcard_ccid_tcp.$(DYN_LIB_EXT)
+READER_CONF = springcard-ccid-tcp.conf
 
 CCID_VERSION=CCID_VERSION=`$(srcdir)/convert_version.pl $(PACKAGE_VERSION)`
 
@@ -65,14 +66,19 @@ INSTALL_UDEV_RULE_FILE=@/bin/echo -e "\n\33[01;31m***************\n" ; echo "cop
 Info.plist: Info.plist.src $(srcdir)/../readers/supported_readers.txt
 	$(srcdir)/create_Info_plist.pl $(srcdir)/../readers/supported_readers.txt $(srcdir)/Info.plist.src --target=$(CCID_LIB) --version=$(VERSION) $(NOCLASS) > Info.plist
 
-DISTCLEANFILES = tokenparser.c Info.plist
+$(READER_CONF): $(srcdir)/reader.conf.in
+	sed 's|TARGET|$(usbdropdir)/$(CCID_BUNDLE)/Contents/$(BUNDLE_HOST)/$(CCID_LIB)|g' $(srcdir)/reader.conf.in > $(READER_CONF)
 
-install: libspringcard_ccid_tcp.la Info.plist
+DISTCLEANFILES = tokenparser.c Info.plist $(READER_CONF)
+
+install: libspringcard_ccid_tcp.la Info.plist $(READER_CONF)
 	$(mkinstalldirs) $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/$(BUNDLE_HOST)/
 	$(mkinstalldirs) $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/Resources/
+	$(mkinstalldirs) $(DESTDIR)$(ethernetconfdir)/
 	cp Info.plist $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/
 	cp .libs/$(CCID_LIB) $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/$(BUNDLE_HOST)/$(CCID_LIB)
 	$(INSTALL_SCRIPT) $(srcdir)/springcard-ccid-tcp-hook $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)/Contents/Resources/springcard-ccid-tcp-hook
+	$(INSTALL_DATA) $(READER_CONF) $(DESTDIR)$(ethernetconfdir)/$(READER_CONF)
 #	$(INSTALL_UDEV_RULE_FILE)
 
 
@@ -81,6 +87,5 @@ install: libspringcard_ccid_tcp.la Info.plist
 
 uninstall:
 	rm -rf $(DESTDIR)$(usbdropdir)/$(CCID_BUNDLE)
-
-
+	rm -f $(DESTDIR)$(ethernetconfdir)/$(READER_CONF)
 

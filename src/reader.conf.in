@@ -1,13 +1,35 @@
-# Gemalto reader with serial communication
-#  - n is the serial port to use n in [0..3]
-#  - reader is the reader name. It is needed for multi-slot readers.
-#    Possible reader values are: 
-#     GemCorePOSPro
-#     GemCoreSIMPro
-#     GemCoreSIMPro2
-#     GemPCPinPad
-#     GemPCTwin (default value)
-# example: /dev/ttyS0:GemPCPinPad
-#DEVICENAME        /dev/ttySn[:reader]
-#FRIENDLYNAME      "GemPCTwin serial"
-#LIBPATH           TARGET
+# SpringCard CCID TCP reader configuration for pcsc-lite.
+#
+# This file is installed as an empty, commented example. pcscd reads reader
+# definitions from the directory configured as serialconfdir, typically:
+#
+#     /etc/reader.conf.d
+#
+# Add one block per network reader and restart pcscd. The LIBPATH below is
+# generated at install time for this build.
+#
+# Example using the legacy positional DEVICENAME format:
+#
+# FRIENDLYNAME      "SpringCard CCID TCP"
+# DEVICENAME        192.168.17.100:3999:00:nokey
+# LIBPATH           TARGET
+# CHANNELID         0
+#
+# DEVICENAME format:
+#
+#     host:port:option:key
+#
+# The newer named format is also accepted:
+#
+# FRIENDLYNAME      "SpringCard CCID TCP"
+# DEVICENAME        host=192.168.17.100:port=3999:options=0x00:key=nokey:slots=1
+# LIBPATH           TARGET
+# CHANNELID         0
+#
+# Supported named fields:
+#
+# - host: reader host name or IPv4 address, mandatory
+# - port: TCP port, default 3999
+# - options: reader option byte, default 0x00
+# - key: reader key string, empty by default
+# - slots: number of slots exposed by this reader, default 1

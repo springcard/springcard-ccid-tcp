@@ -174,11 +174,14 @@ AC_SUBST(hookscript)
 
 # --enable-ethernetconfdir=DIR
 AC_ARG_ENABLE(ethernetconfdir,
-	AS_HELP_STRING([--enable-ethernetconfdir=dir],[directory containing
-		ethernet drivers (default to pcscd config)]),
+	AS_HELP_STRING([--enable-ethernetconfdir=DIR],[directory containing
+		network reader configuration files (default to pcscd config)]),
 	[ethernetconfdir="${enableval}"], [ethernetconfdir=false])
 if test "${ethernetconfdir}" = false ; then
   ethernetconfdir=`$PKG_CONFIG libpcsclite --variable=serialconfdir`
+fi
+if test "${ethernetconfdir}" = "" ; then
+	AC_MSG_ERROR([use --enable-ethernetconfdir=DIR])
 fi
 
 # --disable-pcsclite
@@ -274,4 +277,3 @@ AC_CONFIG_FILES(Makefile
 	readers/Makefile)
 
 AC_OUTPUT
-
