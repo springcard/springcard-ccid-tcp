@@ -1,0 +1,12 @@
+# Insert a minimal pseudo-card one second after the driver starts the reader.
+at 1.0 insert 3B00
+
+# Remove it later so pcscd/card-monitoring behavior can be observed.
+at 20.0 eject
+
+# A few deterministic APDU responses for smoke tests.
+apdu 00A4040000 -> 9000
+apdu 00CA000000 -> 112233449000
+
+# Default response for any other C-APDU.
+apdu * -> 6D00

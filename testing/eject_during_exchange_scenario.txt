@@ -1,0 +1,12 @@
+# Scenario used by testing/testing.sh and pcsc_scenario_test.py.
+#
+# The card appears after pcscd has started the driver. The first APDUs return
+# deterministic responses, then the last exchange simulates a mute card and
+# removes it immediately.
+
+at 1.0 insert 3B00
+
+apdu 00A4040000 -> 9000
+apdu 00CA000000 -> 112233449000
+apdu 80FE000000 -> mute eject
+apdu * -> 6D00

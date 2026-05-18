@@ -1,0 +1,193 @@
+00000000 debuglog.c:394:DebugLogSetLevel() debug level=debug
+00001084 debuglog.c:415:DebugLogSetCategory() Debug options: APDU
+00000995 configfile.l:293:DBGetReaderListDir() Parsing conf directory: /etc/reader.conf.d
+00000635 configfile.l:329:DBGetReaderListDir() Skipping non regular file: .
+00000388 configfile.l:369:DBGetReaderList() Parsing conf file: /etc/reader.conf.d/libccidtwin
+00000846 configfile.l:329:DBGetReaderListDir() Skipping non regular file: ..
+00000635 configfile.l:369:DBGetReaderList() Parsing conf file: /etc/reader.conf.d/springcard-ccid-tcp-test.conf
+00000832 configfile.l:170:evaluatetoken() WARNING *************************************
+00000603 configfile.l:171:evaluatetoken() WARNING: USB drivers SHOULD NOT be declared in a reader.conf file: /usr/lib/pcsc/drivers/ifd-springcard-ccid-tcp.bundle/Contents/Linux/libspringcard_ccid_tcp.so
+00003392 configfile.l:172:evaluatetoken() WARNING *************************************
+00000583 configfile.l:210:evaluatetoken() Add reader: SpringCard PcscOverTcpTest
+00000767 configfile.l:369:DBGetReaderList() Parsing conf file: /etc/reader.conf.d/springcard-ccid-tcp.conf
+00000707 readerfactory.c:1094:RFInitializeReader() Attempting startup of SpringCard PcscOverTcpTest 00 00 using /usr/lib/pcsc/drivers/ifd-springcard-ccid-tcp.bundle/Contents/Linux/libspringcard_ccid_tcp.so
+00001234 readerfactory.c:968:RFBindFunctions() Loading IFD Handler 3.0
+00000714 ifdhandler.c:1897:init_driver() LogLevel: 0x0003
+00000488 ifdhandler.c:1908:init_driver() DriverOptions: 0x0000
+00000419 ifdhandler.c:97:CreateChannelByNameOrChannel() Lun: 0, device: 127.0.0.1:3999:00:nokey
+00000438 ccid_network.c:920:OpenNetworkByName() Reader index: 0, Device: 127.0.0.1:3999:00:nokey
+00000256 ccid_network.c:306:init_driver() init SpringcardNetworkCCIDDriver version: 1.4.23
+00000371 ccid_network.c:657:ParseNetworkDeviceName() Reader host is 127.0.0.1
+00000479 ccid_network.c:658:ParseNetworkDeviceName() TCP port 3999
+00000469 ccid_network.c:659:ParseNetworkDeviceName() Reader option 0x00
+00000477 ccid_network.c:660:ParseNetworkDeviceName() Reader key nokey
+00000478 ccid_network.c:661:ParseNetworkDeviceName() Reader slots 1
+00000507 ccid_network.c:939:OpenNetworkByName() Init multislot_extension 00
+00000556 ifdhandler.c:326:IFDHGetCapabilities() tag: 0xFB3, 127.0.0.1:3999:00:nokey (lun: 0)
+00000331 readerfactory.c:389:RFAddReader() Using the pcscd polling thread
+00000112 ccid_network.c:1439:Multi_PollingProc() 0 : (127.0.0.1): thread starting
+00000457 ifdhandler.c:326:IFDHGetCapabilities() tag: 0xFAE, 127.0.0.1:3999:00:nokey (lun: 0)
+00000319 ccid_network.c:1763:Multi_PollingProc() Check Connection -> STATUS_NO_SUCH_DEVICE
+00000508 ccid_network.c:392:connectToReader() Reader index: 0
+00000506 ccid_network.c:422:connectToReader() gethostbyname: 127.0.0.1
+00000489 ifdhandler.c:415:IFDHGetCapabilities() Reader supports 1 slot(s)
+00000659 pcscdaemon.c:671:main() pcsc-lite 2.0.3 daemon ready.
+00000915 ccid_network.c:437:connectToReader() gethostbyname: 3999
+00000680 pcscdaemon.c:754:main() Using drivers directory: /usr/lib/pcsc/drivers
+00000899 ccid_network.c:447:connectToReader() CONNECTED 3999
+00001532 ccid_network.c:789:NetworkLoadReaderDescriptor() get device descriptor
+00001449 ccid_network.c:801:NetworkLoadReaderDescriptor() get device configuration
+00001413 ccid_network.c:814:NetworkLoadReaderDescriptor() get device vendor name
+00001097 ccid_network.c:826:NetworkLoadReaderDescriptor() get device product name
+00000750 ccid_network.c:838:NetworkLoadReaderDescriptor() get device serial number
+00000714 ccid_network.c:850:NetworkLoadReaderDescriptor() Vendor Name  : SpringCar
+00000562 ccid_network.c:851:NetworkLoadReaderDescriptor() Product Name : PcscOverTcpTes
+00000336 ccid_network.c:852:NetworkLoadReaderDescriptor() Serial Number: 0102030
+00000391 ccid_network.c:853:NetworkLoadReaderDescriptor() dwFeatures : 0x4047e
+00000441 ccid_network.c:854:NetworkLoadReaderDescriptor() dwFeatures : 7E 04 04 00 
+00000820 ccid_network.c:856:NetworkLoadReaderDescriptor() Start Configuration
+00002080 ccid_network.c:881:NetworkLoadReaderDescriptor() Reader reports 1 slot(s)
+00000701 ccid_network.c:1777:Multi_PollingProc() Check Connection -> STATUS_DEVICE_IS_PRESENT
+01001065 ccid_network.c:1599:Multi_PollingProc() Irq(0): 83 50 1 0 0 0 0 0 0 0 0 3 RD 12
+00185582 ifdhandler.c:1089:IFDHPowerICC() action: PowerUp, 127.0.0.1:3999:00:nokey (lun: 0)
+00000381 ccid_network.c:1120:WriteNetwork() PC_To_RDR_IccPowerOn(0): 62 00 00 00 00 00 00 00 00 00 38  -> WR 11
+00000099 ccid_network.c:1677:Multi_PollingProc() power_on_in_progress 0 CardStatus 00
+00000542 ccid_network.c:1753:Multi_PollingProc() RDR_To_PC_DataBlock(0) : 80 2 0 0 0 0 0 0 0 0  RD 0
+00000017 ccid_network.c:1214:ReadNetwork() Timeout(0) - Stop OK 0
+00000633 ccid_network.c:1273:ReadNetwork() 0 Status 250 Read 12
+00000218 eventhandler.c:406:EHStatusHandlerThread() powerState: POWER_STATE_POWERED
+00000207 eventhandler.c:423:EHStatusHandlerThread() Card inserted into SpringCard PcscOverTcpTest 00 00
+00000215 Card ATR: 3B 00 
+00400544 ifdhandler.c:1089:IFDHPowerICC() action: PowerDown, 127.0.0.1:3999:00:nokey (lun: 0)
+00001366 ccid_network.c:1120:WriteNetwork() PC_To_RDR_IccPowerOff(0): 63 00 00 00 00 00 01 00 00 00 00  -> WR 11
+00000906 ccid_network.c:1257:ReadNetwork() ???? Condition before wait 0 0
+00001343 ccid_network.c:1273:ReadNetwork() 0 Status 250 Read 10
+00000856 eventhandler.c:482:EHStatusHandlerThread() powerState: POWER_STATE_UNPOWERED
+00000340 ccid_network.c:1753:Multi_PollingProc() RDR_To_PC_SlotStatus(0) : 81 0 0 0 0 0 1 1 0 0  RD 0
+00434286 winscard_msg_srv.c:256:ProcessEventsServer() Common channel packet arrival
+00000670 winscard_msg_srv.c:267:ProcessEventsServer() ProcessCommonChannelRequest detects: 8
+00000575 pcscdaemon.c:132:SVCServiceRunLoop() A new context thread creation is requested: 8
+00005342 winscard_svc.c:360:ContextThread() Authorized PC/SC client
+00000455 winscard_svc.c:363:ContextThread() Thread is started: dwClientID=8, threadContext @0x55faf90e3220
+00000238 winscard_svc.c:381:ContextThread() Received command: CMD_VERSION from client 8
+00000202 winscard_svc.c:393:ContextThread() Client is protocol version 4:4
+00000205 winscard_svc.c:416:ContextThread() CMD_VERSION for client 8, rv=SCARD_S_SUCCESS
+00000347 winscard_svc.c:381:ContextThread() Received command: ESTABLISH_CONTEXT from client 8
+00000291 winscard.c:210:SCardEstablishContext() Establishing Context: 0x5FC02753
+00000601 winscard_svc.c:485:ContextThread() ESTABLISH_CONTEXT for client 8, rv=SCARD_S_SUCCESS
+00000632 winscard_svc.c:381:ContextThread() Received command: CMD_GET_READERS_STATE from client 8
+00000448 winscard_svc.c:381:ContextThread() Received command: CMD_GET_READERS_STATE from client 8
+00000592 winscard_msg_srv.c:256:ProcessEventsServer() Common channel packet arrival
+00000450 winscard_msg_srv.c:267:ProcessEventsServer() ProcessCommonChannelRequest detects: 11
+00000406 pcscdaemon.c:132:SVCServiceRunLoop() A new context thread creation is requested: 11
+00003965 winscard_svc.c:360:ContextThread() Authorized PC/SC client
+00000199 winscard_svc.c:363:ContextThread() Thread is started: dwClientID=11, threadContext @0x55faf90ebab0
+00000291 winscard_svc.c:381:ContextThread() Received command: CMD_VERSION from client 11
+00000277 winscard_svc.c:393:ContextThread() Client is protocol version 4:4
+00000215 winscard_svc.c:416:ContextThread() CMD_VERSION for client 11, rv=SCARD_S_SUCCESS
+00000342 winscard_svc.c:381:ContextThread() Received command: ESTABLISH_CONTEXT from client 11
+00000236 winscard.c:210:SCardEstablishContext() Establishing Context: 0x11BBD1E1
+00000329 winscard_svc.c:485:ContextThread() ESTABLISH_CONTEXT for client 11, rv=SCARD_S_SUCCESS
+00000364 winscard_svc.c:381:ContextThread() Received command: CONNECT from client 11
+00003552 winscard_svc.c:526:ContextThread() Authorized client for 'SpringCard PcscOverTcpTest 00 00'
+00000372 winscard.c:253:SCardConnect() Attempting Connect to SpringCard PcscOverTcpTest 00 00 using protocol: 3
+00000177 readerfactory.c:835:RFReaderInfo() RefReader() count was: 1
+00000224 ifdhandler.c:1089:IFDHPowerICC() action: PowerUp, 127.0.0.1:3999:00:nokey (lun: 0)
+00000260 ccid_network.c:1120:WriteNetwork() PC_To_RDR_IccPowerOn(0): 62 00 00 00 00 00 02 00 00 00 00  -> WR 11
+00000215 ccid_network.c:1677:Multi_PollingProc() power_on_in_progress 0 CardStatus 00
+00000482 ccid_network.c:1753:Multi_PollingProc() RDR_To_PC_DataBlock(0) : 80 2 0 0 0 0 2 0 0 0  RD 0
+00000014 ccid_network.c:1214:ReadNetwork() Timeout(0) - Stop OK 0
+00000788 ccid_network.c:1273:ReadNetwork() 0 Status 250 Read 12
+00000344 winscard.c:327:SCardConnect() power up complete.
+00000192 Card ATR: 3B 00 
+00000244 winscard.c:347:SCardConnect() powerState: POWER_STATE_IN_USE
+00000206 prothandler.c:108:PHSetProtocol() Attempting PTS to T=0
+00000272 ifdhandler.c:632:IFDHSetProtocolParameters() protocol T=0, 127.0.0.1:3999:00:nokey (lun: 0)
+00000242 winscard.c:428:SCardConnect() Active Protocol: T=0
+00000209 winscard.c:454:SCardConnect() hCard Identity: 1ea0fc58
+00000287 winscard.c:516:SCardConnect() UnrefReader() count was: 2
+00000245 winscard_svc.c:546:ContextThread() CONNECT for client 11, rv=SCARD_S_SUCCESS
+00000533 winscard_svc.c:381:ContextThread() Received command: TRANSMIT from client 11
+00000175 readerfactory.c:862:RFReaderInfoById() RefReader() count was: 1
+00000269 winscard.c:1597:SCardTransmit() Send Protocol: T=0
+00000264 APDU: 00 A4 04 00 00 
+00000299 ifdhandler.c:1233:IFDHTransmitToICC() 127.0.0.1:3999:00:nokey (lun: 0)
+00000262 ccid_network.c:1120:WriteNetwork() PC_To_RDR_XfrBlock(0): 6F 05 00 00 00 00 03 00 00 00 00  -> WR 16
+00000514 ccid_network.c:1753:Multi_PollingProc() RDR_To_PC_DataBlock(0) : 80 2 0 0 0 0 3 0 0 0  RD 0
+00000013 ccid_network.c:1214:ReadNetwork() Timeout(0) - Stop OK 0
+00000400 ccid_network.c:1273:ReadNetwork() 0 Status 250 Read 12
+00000223 SW: 90 00 
+00000216 winscard.c:1650:SCardTransmit() UnrefReader() count was: 2
+00000213 winscard_svc.c:719:ContextThread() TRANSMIT for client 11, rv=SCARD_S_SUCCESS
+00000285 winscard_svc.c:381:ContextThread() Received command: TRANSMIT from client 11
+00000182 readerfactory.c:862:RFReaderInfoById() RefReader() count was: 1
+00000224 winscard.c:1597:SCardTransmit() Send Protocol: T=0
+00000214 APDU: 00 CA 00 00 00 
+00000212 ifdhandler.c:1233:IFDHTransmitToICC() 127.0.0.1:3999:00:nokey (lun: 0)
+00000227 ccid_network.c:1120:WriteNetwork() PC_To_RDR_XfrBlock(0): 6F 05 00 00 00 00 04 00 00 00 00  -> WR 16
+00000465 ccid_network.c:1214:ReadNetwork() Timeout(0) - Stop OK 0
+00000002 ccid_network.c:1753:Multi_PollingProc() RDR_To_PC_DataBlock(0) : 80 6 0 0 0 0 4 0 0 0  RD 0
+00000276 ccid_network.c:1273:ReadNetwork() 0 Status 250 Read 16
+00000527 SW: 11 22 33 44 90 00 
+00000245 winscard.c:1650:SCardTransmit() UnrefReader() count was: 2
+00000152 winscard_svc.c:719:ContextThread() TRANSMIT for client 11, rv=SCARD_S_SUCCESS
+00000293 winscard_svc.c:381:ContextThread() Received command: TRANSMIT from client 11
+00000109 readerfactory.c:862:RFReaderInfoById() RefReader() count was: 1
+00000229 winscard.c:1597:SCardTransmit() Send Protocol: T=0
+00000161 APDU: 80 FE 00 00 00 
+00000199 ifdhandler.c:1233:IFDHTransmitToICC() 127.0.0.1:3999:00:nokey (lun: 0)
+00000226 ccid_network.c:1120:WriteNetwork() PC_To_RDR_XfrBlock(0): 6F 05 00 00 00 00 05 00 00 00 80  -> WR 16
+00000512 ccid_network.c:1599:Multi_PollingProc() Irq(0): 83 50 1 0 0 0 0 0 0 0 0 2 RD 12
+00042704 ccid_network.c:1753:Multi_PollingProc() RDR_To_PC_DataBlock(0) : 80 0 0 0 0 0 5 40 F0 0  RD 0
+00000097 ccid_network.c:1214:ReadNetwork() Timeout(0) - Stop OK 0
+00001356 ccid_network.c:1273:ReadNetwork() 0 Status 250 Read 10
+00000474 commands.c:1529:CCID_Receive PIN timeout
+00000599 SW: 64 00 
+00000502 winscard.c:1650:SCardTransmit() UnrefReader() count was: 2
+00000477 winscard_svc.c:719:ContextThread() TRANSMIT for client 11, rv=SCARD_S_SUCCESS
+00000714 winscard_svc.c:381:ContextThread() Received command: DISCONNECT from client 11
+00000490 readerfactory.c:862:RFReaderInfoById() RefReader() count was: 1
+00000432 winscard.c:883:SCardDisconnect() Active Contexts: 1
+00000421 winscard.c:884:SCardDisconnect() dwDisposition: 2
+00000332 winscard.c:906:SCardDisconnect() powerState: POWER_STATE_UNPOWERED
+00000432 winscard.c:931:SCardDisconnect() Error powering down card: rv=SCARD_W_REMOVED_CARD
+00000458 ifdhandler.c:326:IFDHGetCapabilities() tag: 0xFB2, 127.0.0.1:3999:00:nokey (lun: 0)
+00000450 winscard.c:1045:SCardDisconnect() UnrefReader() count was: 2
+00000532 winscard_svc.c:583:ContextThread() DISCONNECT for client 11, rv=SCARD_S_SUCCESS
+00000605 winscard_msg_srv.c:256:ProcessEventsServer() Common channel packet arrival
+00000528 winscard_msg_srv.c:267:ProcessEventsServer() ProcessCommonChannelRequest detects: 13
+00000546 pcscdaemon.c:132:SVCServiceRunLoop() A new context thread creation is requested: 13
+00008193 winscard_svc.c:360:ContextThread() Authorized PC/SC client
+00000570 winscard_svc.c:363:ContextThread() Thread is started: dwClientID=13, threadContext @0x55faf90ebcd0
+00000362 winscard_svc.c:381:ContextThread() Received command: CMD_VERSION from client 13
+00000387 winscard_svc.c:393:ContextThread() Client is protocol version 4:4
+00000544 winscard_svc.c:416:ContextThread() CMD_VERSION for client 13, rv=SCARD_S_SUCCESS
+00000488 winscard_svc.c:381:ContextThread() Received command: ESTABLISH_CONTEXT from client 13
+00000327 winscard.c:210:SCardEstablishContext() Establishing Context: 0x43D8C8F
+00000500 winscard_svc.c:485:ContextThread() ESTABLISH_CONTEXT for client 13, rv=SCARD_S_SUCCESS
+00000656 winscard_svc.c:381:ContextThread() Received command: CONNECT from client 13
+00003382 winscard_svc.c:526:ContextThread() Authorized client for 'SpringCard PcscOverTcpTest 00 00'
+00000318 winscard.c:253:SCardConnect() Attempting Connect to SpringCard PcscOverTcpTest 00 00 using protocol: 3
+00000415 readerfactory.c:835:RFReaderInfo() RefReader() count was: 1
+00000435 winscard.c:307:SCardConnect() Card Not Inserted
+00000450 winscard.c:516:SCardConnect() UnrefReader() count was: 2
+00000427 winscard_svc.c:546:ContextThread() CONNECT for client 13, rv=SCARD_E_NO_SMARTCARD
+00000556 winscard_svc.c:381:ContextThread() Received command: RELEASE_CONTEXT from client 13
+00000429 winscard.c:224:SCardReleaseContext() Releasing Context: 0x43D8C8F
+00000311 winscard_svc.c:500:ContextThread() RELEASE_CONTEXT for client 13, rv=SCARD_S_SUCCESS
+00000391 winscard_svc.c:374:ContextThread() Client die: 13
+00000182 winscard_svc.c:1096:MSGCleanupClient() Thread is stopping: dwClientID=13, threadContext @0x55faf90ebcd0
+00000415 winscard_svc.c:1104:MSGCleanupClient() Freeing SCONTEXT @0x55faf90ebcd0
+00000171 winscard_svc.c:381:ContextThread() Received command: RELEASE_CONTEXT from client 11
+00001425 winscard.c:224:SCardReleaseContext() Releasing Context: 0x11BBD1E1
+00000469 winscard_svc.c:500:ContextThread() RELEASE_CONTEXT for client 11, rv=SCARD_S_SUCCESS
+00000975 winscard_svc.c:374:ContextThread() Client die: 11
+00000707 winscard_svc.c:1096:MSGCleanupClient() Thread is stopping: dwClientID=11, threadContext @0x55faf90ebab0
+00000623 winscard_svc.c:1104:MSGCleanupClient() Freeing SCONTEXT @0x55faf90ebab0
+00003951 winscard_svc.c:374:ContextThread() Client die: 8
+00000723 winscard.c:224:SCardReleaseContext() Releasing Context: 0x5FC02753
+00001575 winscard_svc.c:1096:MSGCleanupClient() Thread is stopping: dwClientID=8, threadContext @0x55faf90e3220
+00000202 pcscdaemon.c:192:signal_thread() Received signal: 15
+00000481 pcscdaemon.c:212:signal_thread() Direct suicide
+00000677 pcscdaemon.c:809:at_exit() cleaning /run/pcscd
+00000602 winscard_svc.c:1104:MSGCleanupClient() Freeing SCONTEXT @0x55faf90e3220

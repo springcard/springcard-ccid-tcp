@@ -84,3 +84,5 @@ stamp-h1
 *.la
 *.lai
 *.so
+__pycache__/
+*.pyc
