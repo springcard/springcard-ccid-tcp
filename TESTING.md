@@ -26,6 +26,8 @@ sudo apt install -y \
   libtool \
   pkg-config \
   libpcsclite-dev \
+  pcscd \
+  pcsc-tools \
   flex \
   git
 ```
