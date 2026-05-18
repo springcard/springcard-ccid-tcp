@@ -5,11 +5,12 @@ aclocal.m4
 ar-lib
 autom4te.cache/output.0
 autom4te.cache/output.1
- autom4te.cache/output.2
+autom4te.cache/output.2
 autom4te.cache/requests
 autom4te.cache/traces.0
 autom4te.cache/traces.1
 autom4te.cache/traces.2
+autom4te.cache/
 compile
 config.guess
 config.h
@@ -28,6 +29,7 @@ readers/Makefile.in
 src/Info.plist
 src/Makefile
 src/Makefile.in
+src/tokenparser.c
 src/libspringcard_ccid_tcp.la
 src/libspringcard_ccid_tcp_la-ccid.lo
 src/libspringcard_ccid_tcp_la-ccid_network.lo
@@ -67,3 +69,12 @@ src/openct/.deps/.dirstamp
 src/openct/.dirstamp
 src/towitoko/.deps/.dirstamp
 src/towitoko/.dirstamp
+stamp-h1
+.deps/
+.libs/
+.dirstamp
+*.o
+*.lo
+*.la
+*.lai
+*.so
