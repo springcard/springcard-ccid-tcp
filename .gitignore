@@ -23,7 +23,9 @@ configure
 depcomp
 install-sh
 libtool
+ltmain.sh
 missing
+ylwrap
 readers/Makefile
 readers/Makefile.in
 src/Info.plist
