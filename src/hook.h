@@ -10,6 +10,7 @@
 #ifndef __HOOK_H__
 #define __HOOK_H__
 
-void ReaderHookNotifyState(const char *reader_name, const char *state);
+void ReaderHookNotifyState(const char *reader_name, const char *state,
+	const char *hook_script_path);
 
 #endif

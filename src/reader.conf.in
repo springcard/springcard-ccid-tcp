@@ -33,3 +33,27 @@
 # - options: reader option byte, default 0x00
 # - key: reader key string, empty by default
 # - slots: number of slots exposed by this reader, default 1
+#
+# Configuration may also be moved to an external INI-style file:
+#
+# FRIENDLYNAME      "SpringCard CCID TCP"
+# DEVICENAME        file=/etc/springcard-ccid-tcp/readers.conf
+# LIBPATH           TARGET
+# CHANNELID         0
+#
+# Or select a specific section:
+#
+# DEVICENAME        file=/etc/springcard-ccid-tcp/readers.conf:section=front-desk
+#
+# External configuration example:
+#
+# [front-desk]
+# host=192.168.17.100
+# port=3999
+# options=0x00
+# key=nokey
+# slots=1
+# hook=/usr/local/sbin/springcard-reader-hook
+#
+# In external files, host is mandatory. Defaults are port=3999, options=0x00,
+# key=nokey, slots=1 and the installed springcard-ccid-tcp-hook script.

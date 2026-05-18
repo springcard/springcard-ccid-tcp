@@ -151,6 +151,38 @@ as the first unnamed token:
     host=192.168.17.100:port=3999:options=0x00:key=nokey:slots=1
     192.168.17.100:slots=4
 
+The configuration may also be moved to a separate INI-style file:
+
+    file=<filename>[:section=<section>]
+
+Example DEVICENAME:
+
+    file=/etc/springcard-ccid-tcp/readers.conf
+    file=/etc/springcard-ccid-tcp/readers.conf:section=front-desk
+
+Example external configuration:
+
+    [front-desk]
+    host=192.168.17.100
+    port=3999
+    options=0x00
+    key=nokey
+    slots=1
+    hook=/usr/local/sbin/springcard-reader-hook
+
+Supported external configuration fields:
+
+- host: reader host name or IPv4 address, mandatory
+- port: TCP port, default 3999
+- options: reader option byte, default 0x00
+- key: reader key string, default nokey
+- slots: number of slots exposed by this reader, default 1
+- hook: availability hook script, default springcard-ccid-tcp-hook from the
+  installed driver bundle
+
+When section= is omitted, the file may contain plain key=value lines. If it
+contains sections, the first section is used.
+
 After changing the reader configuration file, restart pcscd.
 
 Important for pcsc-lite 2.2.0 and later: upstream pcsc-lite now uses Meson, and

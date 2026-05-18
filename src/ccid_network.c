@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <ctype.h>
 #ifdef S_SPLINT_S
 #include <sys/types.h>
 #endif
@@ -197,6 +198,7 @@ typedef struct
 	char serial_number[50];
 	unsigned char options;
 	char key[16];
+	char hook_script_path[512];
 
 	/* pointer to the multislot extension (if any) */
 	struct networkDevice_MultiSlot_Extension *multislot_extension;
@@ -214,6 +216,8 @@ static struct networkDevice_MultiSlot_Extension *Multi_CreateFirstSlot(int reade
 static void Multi_PollingTerminate(struct networkDevice_MultiSlot_Extension *msExt);
 
 static status_t ParseNetworkDeviceName(unsigned int reader_index, /*@null@*/ const char *device);
+static status_t ParseNetworkDeviceConfigFile(unsigned int reader_index,
+	const char *filename, const char *section, int *host_is_set);
 static void NetworkInitDefaultDescriptor(unsigned int reader_index);
 static status_t NetworkLoadReaderDescriptor(unsigned int reader_index);
 static void NetworkMarkReaderAbsent(unsigned int reader_index, status_t status);
@@ -511,6 +515,34 @@ static status_t SetNetworkDeviceHost(unsigned int reader_index, const char *host
 	return STATUS_SUCCESS;
 }
 
+static char *TrimConfigText(char *text)
+{
+	char *end;
+
+	while (isspace((unsigned char)*text))
+		text++;
+
+	if (*text == '\0')
+		return text;
+
+	end = text + strlen(text) - 1;
+	while ((end > text) && isspace((unsigned char)*end))
+		*end-- = '\0';
+
+	return text;
+}
+
+static status_t SetNetworkDeviceHook(unsigned int reader_index, const char *hook)
+{
+	if ((hook == NULL) || (*hook == '\0') ||
+		(strlen(hook) >= sizeof(networkDevice[reader_index].hook_script_path)))
+		return STATUS_UNSUCCESSFUL;
+
+	snprintf(networkDevice[reader_index].hook_script_path,
+		sizeof(networkDevice[reader_index].hook_script_path), "%s", hook);
+	return STATUS_SUCCESS;
+}
+
 static status_t ParseNamedNetworkDeviceToken(unsigned int reader_index, const char *token, int *host_is_set)
 {
 	const char *value;
@@ -564,12 +596,204 @@ static status_t ParseNamedNetworkDeviceToken(unsigned int reader_index, const ch
 			return STATUS_UNSUCCESSFUL;
 		networkDevice[reader_index].configured_slots = parsed;
 	}
+	else if ((name_len == 4) && (strncmp(token, "hook", name_len) == 0))
+	{
+		if (SetNetworkDeviceHook(reader_index, value) != STATUS_SUCCESS)
+			return STATUS_UNSUCCESSFUL;
+	}
 	else
 	{
 		return STATUS_UNSUCCESSFUL;
 	}
 
 	return STATUS_SUCCESS;
+}
+
+static status_t ParseNetworkDeviceConfigLine(unsigned int reader_index,
+	char *line, int *host_is_set)
+{
+	char *value;
+	char *name;
+
+	value = strchr(line, '=');
+	if (value == NULL)
+		return STATUS_UNSUCCESSFUL;
+
+	*value++ = '\0';
+	name = TrimConfigText(line);
+	value = TrimConfigText(value);
+	if ((*name == '\0') || (*value == '\0'))
+		return STATUS_UNSUCCESSFUL;
+
+	if (strcmp(name, "host") == 0)
+	{
+		if (*host_is_set || (SetNetworkDeviceHost(reader_index, value) != STATUS_SUCCESS))
+			return STATUS_UNSUCCESSFUL;
+		*host_is_set = TRUE;
+		return STATUS_SUCCESS;
+	}
+
+	if (strcmp(name, "port") == 0)
+	{
+		unsigned int parsed;
+		if (ParseUnsignedOption(value, 1, 65535, &parsed) != 0)
+			return STATUS_UNSUCCESSFUL;
+		networkDevice[reader_index].reader_port = parsed;
+		return STATUS_SUCCESS;
+	}
+
+	if (strcmp(name, "options") == 0)
+	{
+		unsigned int parsed;
+		if (ParseUnsignedOption(value, 0, 0xFF, &parsed) != 0)
+			return STATUS_UNSUCCESSFUL;
+		networkDevice[reader_index].options = (unsigned char)parsed;
+		return STATUS_SUCCESS;
+	}
+
+	if (strcmp(name, "key") == 0)
+	{
+		snprintf(networkDevice[reader_index].key,
+			sizeof(networkDevice[reader_index].key), "%s", value);
+		return STATUS_SUCCESS;
+	}
+
+	if (strcmp(name, "slots") == 0)
+	{
+		unsigned int parsed;
+		if (ParseUnsignedOption(value, 1, SPRINGCARD_MAX_SLOT, &parsed) != 0)
+			return STATUS_UNSUCCESSFUL;
+		networkDevice[reader_index].configured_slots = parsed;
+		return STATUS_SUCCESS;
+	}
+
+	if (strcmp(name, "hook") == 0)
+		return SetNetworkDeviceHook(reader_index, value);
+
+	return STATUS_UNSUCCESSFUL;
+}
+
+static status_t ParseNetworkDeviceConfigFile(unsigned int reader_index,
+	const char *filename, const char *section, int *host_is_set)
+{
+	FILE *file;
+	char line[1024];
+	char first_section[128];
+	int in_section = (section == NULL) ? TRUE : FALSE;
+	int have_first_section = FALSE;
+	status_t status = STATUS_SUCCESS;
+
+	if ((filename == NULL) || (*filename == '\0') || (host_is_set == NULL))
+		return STATUS_UNSUCCESSFUL;
+
+	file = fopen(filename, "r");
+	if (file == NULL)
+		return STATUS_UNSUCCESSFUL;
+
+	first_section[0] = '\0';
+
+	while (fgets(line, sizeof(line), file) != NULL)
+	{
+		char *text = TrimConfigText(line);
+		char *comment;
+		size_t len;
+
+		comment = strchr(text, '#');
+		if (comment != NULL)
+			*comment = '\0';
+		comment = strchr(text, ';');
+		if (comment != NULL)
+			*comment = '\0';
+		text = TrimConfigText(text);
+
+		if (*text == '\0')
+			continue;
+
+		len = strlen(text);
+		if ((text[0] == '[') && (len >= 3) && (text[len - 1] == ']'))
+		{
+			text[len - 1] = '\0';
+			text = TrimConfigText(text + 1);
+			if (*text == '\0')
+			{
+				status = STATUS_UNSUCCESSFUL;
+				break;
+			}
+
+			if (section != NULL)
+			{
+				in_section = (strcmp(text, section) == 0);
+			}
+			else
+			{
+				if (!have_first_section)
+				{
+					snprintf(first_section, sizeof(first_section), "%s", text);
+					have_first_section = TRUE;
+				}
+				in_section = (strcmp(text, first_section) == 0);
+			}
+			continue;
+		}
+
+		if (!in_section)
+			continue;
+
+		status = ParseNetworkDeviceConfigLine(reader_index, text, host_is_set);
+		if (status != STATUS_SUCCESS)
+			break;
+	}
+
+	if (ferror(file))
+		status = STATUS_UNSUCCESSFUL;
+
+	fclose(file);
+	return status;
+}
+
+static status_t ParseNetworkDeviceNameFileMode(unsigned int reader_index,
+	char *readerNameTokens, int *host_is_set)
+{
+	char *token;
+	char *next;
+	char *filename = NULL;
+	char *section = NULL;
+	status_t status = STATUS_SUCCESS;
+
+	token = readerNameTokens;
+	while (token != NULL)
+	{
+		next = strchr(token, ':');
+		if (next != NULL)
+			*next++ = '\0';
+
+		if (strncmp(token, "file=", 5) == 0)
+		{
+			if ((filename != NULL) || (token[5] == '\0'))
+				return STATUS_UNSUCCESSFUL;
+			filename = token + 5;
+		}
+		else if (strncmp(token, "section=", 8) == 0)
+		{
+			if ((section != NULL) || (token[8] == '\0'))
+				return STATUS_UNSUCCESSFUL;
+			section = token + 8;
+		}
+		else
+		{
+			return STATUS_UNSUCCESSFUL;
+		}
+
+		token = next;
+	}
+
+	if (filename == NULL)
+		return STATUS_UNSUCCESSFUL;
+
+	snprintf(networkDevice[reader_index].key,
+		sizeof(networkDevice[reader_index].key), "%s", "nokey");
+	status = ParseNetworkDeviceConfigFile(reader_index, filename, section, host_is_set);
+	return status;
 }
 
 static status_t ParseNetworkDeviceName(unsigned int reader_index, /*@null@*/ const char *device)
@@ -589,6 +813,24 @@ static status_t ParseNetworkDeviceName(unsigned int reader_index, /*@null@*/ con
 	readerNameTokens = strdup(device);
 	if (readerNameTokens == NULL)
 		return STATUS_UNSUCCESSFUL;
+
+	if (strncmp(readerNameTokens, "file=", 5) == 0)
+	{
+		status = ParseNetworkDeviceNameFileMode(reader_index,
+			readerNameTokens, &host_is_set);
+		free(readerNameTokens);
+		if ((status != STATUS_SUCCESS) || !host_is_set)
+			return STATUS_UNSUCCESSFUL;
+
+		DEBUG_INFO2("Reader host is %s", networkDevice[reader_index].reader_ip);
+		DEBUG_INFO2("TCP port %d", networkDevice[reader_index].reader_port);
+		DEBUG_INFO2("Reader option 0x%02x", networkDevice[reader_index].options);
+		DEBUG_INFO2("Reader key %s", networkDevice[reader_index].key);
+		DEBUG_INFO2("Reader slots %d", networkDevice[reader_index].configured_slots);
+		DEBUG_INFO2("Reader hook %s", networkDevice[reader_index].hook_script_path);
+
+		return STATUS_SUCCESS;
+	}
 
 	named_mode = (strchr(readerNameTokens, '=') != NULL);
 	token = readerNameTokens;
@@ -659,6 +901,7 @@ static status_t ParseNetworkDeviceName(unsigned int reader_index, /*@null@*/ con
 	DEBUG_INFO2("Reader option 0x%02x", networkDevice[reader_index].options);
 	DEBUG_INFO2("Reader key %s", networkDevice[reader_index].key);
 	DEBUG_INFO2("Reader slots %d", networkDevice[reader_index].configured_slots);
+	DEBUG_INFO2("Reader hook %s", networkDevice[reader_index].hook_script_path);
 
 	return STATUS_SUCCESS;
 }
@@ -775,7 +1018,8 @@ static void NetworkNotifyReaderState(unsigned int reader_index, const char *stat
 	if ((reader_name == NULL) || (*reader_name == '\0'))
 		reader_name = networkDevice[reader_index].reader_ip;
 
-	ReaderHookNotifyState(reader_name, state);
+	ReaderHookNotifyState(reader_name, state,
+		networkDevice[reader_index].hook_script_path);
 }
 
 static status_t NetworkLoadReaderDescriptor(unsigned int reader_index)
@@ -926,6 +1170,7 @@ status_t OpenNetworkByName(unsigned int reader_index, /*@null@*/ char *device)
 	networkDevice[reader_index].options = 0x00;
 	networkDevice[reader_index].configured_slots = READER_DEFAULT_SLOTS;
 	networkDevice[reader_index].key[0] = '\0';
+	SetNetworkDeviceHook(reader_index, HOOK_SCRIPT_PATH);
 
 	if (ParseNetworkDeviceName(reader_index, device) != STATUS_SUCCESS)
 	{
@@ -1901,4 +2146,3 @@ static struct networkDevice_MultiSlot_Extension *Multi_CreateFirstSlot(int reade
 
 	return msExt;
 } /* Multi_CreateFirstSlot */
-

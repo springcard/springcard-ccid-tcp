@@ -52,6 +52,7 @@ struct reader_hook_args
 {
 	char *reader_name;
 	char *state;
+	char *hook_script_path;
 };
 
 #if defined(HAVE_PTHREAD) && defined(HAVE_POSIX_SPAWN) && defined(HAVE_SPAWN_H) && defined(HAVE_WAITPID) && defined(HAVE_SYS_WAIT_H) && defined(HAVE_KILL) && defined(HAVE_SIGNAL_H)
@@ -65,6 +66,7 @@ static void free_hook_args(struct reader_hook_args *args)
 	{
 		free(args->reader_name);
 		free(args->state);
+		free(args->hook_script_path);
 		free(args);
 	}
 }
@@ -81,7 +83,7 @@ static pid_t spawn_hook_script(const struct reader_hook_args *args)
 	posix_spawn_file_actions_t file_actions;
 	int file_actions_ready = 0;
 
-	argv[0] = (char *)HOOK_SCRIPT_PATH;
+	argv[0] = args->hook_script_path;
 	argv[1] = args->reader_name;
 	argv[2] = args->state;
 	argv[3] = NULL;
@@ -97,7 +99,7 @@ static pid_t spawn_hook_script(const struct reader_hook_args *args)
 			"/dev/null", O_WRONLY, 0);
 	}
 
-	if (posix_spawn(&pid, HOOK_SCRIPT_PATH,
+	if (posix_spawn(&pid, args->hook_script_path,
 		file_actions_ready ? &file_actions : NULL, NULL, argv, envp) != 0)
 	{
 		if (file_actions_ready)
@@ -136,7 +138,7 @@ static void *reader_hook_thread(void *opaque)
 	int elapsed;
 
 #ifdef HAVE_ACCESS
-	if (access(HOOK_SCRIPT_PATH, X_OK) != 0)
+	if (access(args->hook_script_path, X_OK) != 0)
 	{
 		free_hook_args(args);
 		return NULL;
@@ -146,7 +148,7 @@ static void *reader_hook_thread(void *opaque)
 	pid = spawn_hook_script(args);
 	if (pid < 0)
 	{
-		DEBUG_CRITICAL2("failed to spawn hook script %s", HOOK_SCRIPT_PATH);
+		DEBUG_CRITICAL2("failed to spawn hook script %s", args->hook_script_path);
 		free_hook_args(args);
 		return NULL;
 	}
@@ -162,7 +164,7 @@ static void *reader_hook_thread(void *opaque)
 	}
 
 	DEBUG_CRITICAL3("hook script %s timed out for reader %s",
-		HOOK_SCRIPT_PATH, args->reader_name);
+		args->hook_script_path, args->reader_name);
 	terminate_hook_script(pid);
 
 	free_hook_args(args);
@@ -170,7 +172,8 @@ static void *reader_hook_thread(void *opaque)
 }
 #endif
 
-void ReaderHookNotifyState(const char *reader_name, const char *state)
+void ReaderHookNotifyState(const char *reader_name, const char *state,
+	const char *hook_script_path)
 {
 #ifdef READER_HOOK_SUPPORTED
 	pthread_t thread;
@@ -178,6 +181,9 @@ void ReaderHookNotifyState(const char *reader_name, const char *state)
 
 	if ((reader_name == NULL) || (state == NULL))
 		return;
+
+	if ((hook_script_path == NULL) || (*hook_script_path == '\0'))
+		hook_script_path = HOOK_SCRIPT_PATH;
 
 	if ((strcmp(state, "available") != 0)
 		&& (strcmp(state, "unavailable") != 0))
@@ -189,7 +195,9 @@ void ReaderHookNotifyState(const char *reader_name, const char *state)
 
 	args->reader_name = strdup(reader_name);
 	args->state = strdup(state);
-	if ((args->reader_name == NULL) || (args->state == NULL))
+	args->hook_script_path = strdup(hook_script_path);
+	if ((args->reader_name == NULL) || (args->state == NULL)
+		|| (args->hook_script_path == NULL))
 	{
 		free_hook_args(args);
 		return;
@@ -205,5 +213,6 @@ void ReaderHookNotifyState(const char *reader_name, const char *state)
 #else
 	(void)reader_name;
 	(void)state;
+	(void)hook_script_path;
 #endif
 }
